@@ -53,7 +53,7 @@ def test_iterating_algorithm_l_yields_all_gray_codes(num_bits):
     # for Gray code. Apply the switches in order to produce all possible numbers
     # in Gray code order. Determine if this is gives the same results as generating
     # Gray code explicitly.
-    focus_vector = np.arange(num_bits + 1)
+    focus_vector = np.arange(num_bits + 1, dtype=np.int8)
     state = np.zeros(num_bits, dtype=np.int8)
     produced_numbers = [_binary_array_to_number(state)]
 
