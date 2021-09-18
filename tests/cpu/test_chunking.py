@@ -27,7 +27,7 @@ class TestInitialStateForChunk:
         self, num_bits, num_bits_in_chunk, chunk_id
     ):
         initial_state = initial_state_for_chunk(num_bits, num_bits_in_chunk, chunk_id)
-        remaining_bits = num_bits_in_chunk - num_bits
+        remaining_bits = num_bits - num_bits_in_chunk
         np.testing.assert_array_equal(
             initial_state[-remaining_bits:],
             _fixed_width_binary_repr(chunk_id, remaining_bits),
