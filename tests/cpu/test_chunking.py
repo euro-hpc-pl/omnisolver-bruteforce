@@ -32,3 +32,8 @@ class TestInitialStateForChunk:
             initial_state[-remaining_bits:],
             _fixed_width_binary_repr(chunk_id, remaining_bits),
         )
+
+    def test_has_correct_shape_and_dtype(self, num_bits, num_bits_in_chunk, chunk_id):
+        initial_state = initial_state_for_chunk(num_bits, num_bits_in_chunk, chunk_id)
+        assert initial_state.shape == (num_bits,)
+        assert initial_state.dtype == np.int8
