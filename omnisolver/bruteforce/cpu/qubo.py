@@ -16,6 +16,13 @@ class DenseQubo:
 
         return energy
 
+    def energy_diff(self, state, bit_to_flip) -> float:
+        sigma = 1 - 2 * state[bit_to_flip]
+
+        return (self.q_mat[bit_to_flip, :] * state * sigma).sum() + self.q_mat[
+            bit_to_flip, bit_to_flip
+        ] * (1 - state[bit_to_flip])
+
 
 @lru_cache
 def _create_qubo_cls(spec):
