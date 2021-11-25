@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from omnisolver.bruteforce.cpu.qubo import qubo
+from omnisolver.bruteforce.cpu.qubo import qubo_from_matrix
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ class TestQubo:
     )
     def test_cannot_be_initialized_with_non_symmetric_coefficient_matrix(self, q_mat):
         with pytest.raises(ValueError):
-            qubo(q_mat)
+            qubo_from_matrix(q_mat)
 
     @pytest.mark.parametrize(
         "state, expected_energy",
@@ -37,7 +37,7 @@ class TestQubo:
         ],
     )
     def test_correctly_computes_energy_given_state(self, q_mat, state, expected_energy):
-        assert qubo(q_mat).energy(state) == expected_energy
+        assert qubo_from_matrix(q_mat).energy(state) == expected_energy
 
     @pytest.mark.parametrize(
         "state, bit_to_flip",
@@ -56,7 +56,7 @@ class TestQubo:
     ):
         flipped = state.copy()
         flipped[bit_to_flip] = 1 - flipped[bit_to_flip]
-        instance = qubo(q_mat)
-        assert instance.energy_diff(state, bit_to_flip) == instance.energy(
+        qubo = qubo_from_matrix(q_mat)
+        assert qubo.energy_diff(state, bit_to_flip) == qubo.energy(
             flipped
-        ) - instance.energy(state)
+        ) - qubo.energy(state)

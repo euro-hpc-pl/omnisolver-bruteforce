@@ -29,7 +29,7 @@ def _create_qubo_cls(spec):
     return numba.experimental.jitclass(spec)(DenseQubo)
 
 
-def qubo(q_mat) -> DenseQubo:
+def qubo_from_matrix(q_mat) -> DenseQubo:
     if not np.array_equal(q_mat, q_mat.T):
         raise ValueError("QUBO matrix needs to be symmetric.")
 
