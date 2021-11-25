@@ -4,6 +4,12 @@ import numba
 import numpy as np
 
 
+@numba.njit
+def _sigma(x):
+    """Map binary variable to spin variable."""
+    return 1 - 2 * x
+
+
 class DenseQubo:
     def __init__(self, q_mat: np.ndarray):
         self.q_mat = q_mat
@@ -16,19 +22,18 @@ class DenseQubo:
 
         return energy
 
-    def energy_diff(self, state, bit_to_flip) -> float:
-        sigma = 1 - 2 * state[bit_to_flip]
-
-        return (self.q_mat[bit_to_flip, :] * state * sigma).sum() + self.q_mat[
-            bit_to_flip, bit_to_flip
-        ] * (1 - state[bit_to_flip])
+    def energy_diff(self, state, k) -> float:
+        # fmt: off
+        return (
+            (self.q_mat[k, :] * state * _sigma(state[k])).sum() +
+            self.q_mat[k, k] * (1 - state[k])
+        )
+        # fmt: on
 
     def adjust_energy_diff(self, state, k, energy_diff_k, j) -> float:
         if k == j:
             return -energy_diff_k
-        return energy_diff_k + self.q_mat[k, j] * (1 - 2 * state[j]) * (
-            1 - 2 * state[k]
-        )
+        return energy_diff_k + self.q_mat[k, j] * _sigma(state[j]) * _sigma(state[k])
 
 
 @lru_cache
