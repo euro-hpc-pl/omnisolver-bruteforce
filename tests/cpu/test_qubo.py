@@ -60,3 +60,28 @@ class TestQubo:
         assert qubo.energy_diff(state, bit_to_flip) == qubo.energy(
             flipped
         ) - qubo.energy(state)
+
+    @pytest.mark.parametrize(
+        "state, k, j",
+        [
+            (np.zeros(4, dtype=np.int8), 3, 3),
+            (np.zeros(4, dtype=np.int8), 0, 2),
+            (np.array([1, 1, 0, 1], dtype=np.int8), 3, 1),
+            (np.array([0, 1, 1, 0], dtype=np.int8), 0, 0),
+            (np.array([0, 1, 1, 0], dtype=np.int8), 1, 1),
+            (np.ones(4, dtype=np.int8), 0, 1),
+            (np.ones(4, dtype=np.int8), 3, 2),
+        ],
+    )
+    def test_correctly_adjusts_energy_diff_when_another_bit_is_flipped(
+        self, q_mat, state, k, j
+    ):
+        qubo = qubo_from_matrix(q_mat)
+        flipped = state.copy()
+        flipped[j] = 1 - flipped[j]
+
+        energy_diff_k = qubo.energy_diff(state, k)
+
+        assert qubo.energy_diff(flipped, k) == qubo.adjust_energy_diff(
+            state, k, energy_diff_k, j
+        )
