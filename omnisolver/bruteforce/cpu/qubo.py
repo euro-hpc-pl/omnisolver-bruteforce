@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Protocol
 
 import numba
 import numpy as np
@@ -10,18 +11,22 @@ def _sigma(x):
     return 1 - 2 * x
 
 
-class DenseQubo:
-    """Basic dense QUBO for use in CPU-based exhaustive search algorithm.
+class Qubo(Protocol):
+    """Quadratic Unconstrained Binary Optimization problem.
 
-    This class implements operations of computing energy updates based on
-    bit index as defined in the following paper
+    This Protocol serves as the definition of QUBO-related operations needed for
+    implementing exhaustive-search on CPU.
 
+    Currently, the only implementation is DenseQubo. However, in the future we might want to
+    experiment e.g. with some sparse implementation.
+
+    The operations defined in this protocol originate in:
     M. Tao et al., "A Work-Time Optimal Parallel Exhaustive Search Algorithm for the QUBO and the
     Ising model, with GPU implementation"
     2020 IEEE International Parallel and Distributed Processing Symposium Workshops (IPDPSW),
     2020, pp. 557-566, doi: 10.1109/IPDPSW50202.2020.00098.
 
-    The following definitions are used in docstrings of public methods:
+    The following definitions are used in the docstrings of public methods:
 
     E(q): energy of given state q (computed w.r.t. to this QUBO's matrix)
     f_k(q): state obtained by flipping k-th bit of q
@@ -32,14 +37,6 @@ class DenseQubo:
     formulas are a bit different.
     """
 
-    def __init__(self, q_mat: np.ndarray) -> None:
-        """Initialize new DenseQubo instance.
-
-        :param q_mat: coefficient matrix. It should be symmetric, but for performance reasons
-         this assumption is not verified. For safe initialization use `qubo_from_matrix(q_mat)`
-        """
-        self.q_mat = q_mat
-
     def energy(self, state: np.ndarray) -> float:
         """Compute E(state).
 
@@ -47,12 +44,6 @@ class DenseQubo:
          checked if the state has correct length.
         :return: E(state)
         """
-        energy = 0.0
-        for i in range(self.q_mat.shape[0]):
-            for j in range(i, self.q_mat.shape[0]):
-                energy += state[i] * state[j] * self.q_mat[i, j]
-
-        return energy
 
     def energy_diff(self, state, k) -> float:
         """Compute delta_k(state) = E(f_k(state)) - E(state) in Theta(N) time.
@@ -63,12 +54,6 @@ class DenseQubo:
          if k lies in correct range.
         :return: delta_k(state)
         """
-        # fmt: off
-        return (
-            (self.q_mat[k, :] * state * _sigma(state[k])).sum() +
-            self.q_mat[k, k] * (1 - state[k])
-        )
-        # fmt: on
 
     def adjust_energy_diff(self, state, k, energy_diff_k, j) -> float:
         """Compute delta_k(f_j(state)) given delta_k(state) in Theta(1) time.
@@ -82,17 +67,54 @@ class DenseQubo:
          in the correct range.
         :return: delta_k(f_j(state))
         """
+
+
+class DenseQubo:
+    """Basic dense QUBO for use in CPU-based exhaustive search algorithm.
+
+    This class implements Qubo protocol. See its docstring for more elaborate description of public
+    methods.
+    """
+
+    def __init__(self, q_mat: np.ndarray) -> None:
+        """Initialize new DenseQubo instance.
+
+        :param q_mat: coefficient matrix. It should be symmetric, but for performance reasons
+         this assumption is not verified. For safe initialization use `qubo_from_matrix(q_mat)`
+        """
+        self.q_mat = q_mat
+
+    def energy(self, state: np.ndarray) -> float:
+        """Compute E(state)."""
+        energy = 0.0
+        for i in range(self.q_mat.shape[0]):
+            for j in range(i, self.q_mat.shape[0]):
+                energy += state[i] * state[j] * self.q_mat[i, j]
+
+        return energy
+
+    def energy_diff(self, state, k) -> float:
+        """Compute delta_k(state) = E(f_k(state)) - E(state) in Theta(N) time."""
+        # fmt: off
+        return (
+            (self.q_mat[k, :] * state * _sigma(state[k])).sum() +
+            self.q_mat[k, k] * (1 - state[k])
+        )
+        # fmt: on
+
+    def adjust_energy_diff(self, state, k, energy_diff_k, j) -> float:
+        """Compute delta_k(f_j(state)) given delta_k(state) in Theta(1) time."""
         if k == j:
             return -energy_diff_k
         return energy_diff_k + self.q_mat[k, j] * _sigma(state[j]) * _sigma(state[k])
 
 
 @lru_cache
-def _create_qubo_cls(spec):
+def _create_dense_qubo_cls(spec):
     return numba.experimental.jitclass(spec)(DenseQubo)
 
 
-def qubo_from_matrix(q_mat: np.ndarray) -> DenseQubo:
+def qubo_from_matrix(q_mat: np.ndarray) -> Qubo:
     """Create jit-compiled QUBO instance from given symmetric matrix.
 
     .. note::
@@ -110,6 +132,6 @@ def qubo_from_matrix(q_mat: np.ndarray) -> DenseQubo:
 
     spec = (("q_mat", numba.typeof(q_mat)),)
 
-    qubo_cls = _create_qubo_cls(spec)
+    qubo_cls = _create_dense_qubo_cls(spec)
 
     return qubo_cls(q_mat)
