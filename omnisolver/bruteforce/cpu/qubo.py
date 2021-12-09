@@ -68,6 +68,11 @@ class Qubo(Protocol):
         :return: delta_k(f_j(state))
         """
 
+    @property
+    def num_variables(self) -> int:
+        """Number of variables in this model."""
+        raise NotImplementedError()
+
 
 class DenseQubo:
     """Basic dense QUBO for use in CPU-based exhaustive search algorithm.
@@ -107,6 +112,10 @@ class DenseQubo:
         if k == j:
             return -energy_diff_k
         return energy_diff_k + self.q_mat[k, j] * _sigma(state[j]) * _sigma(state[k])
+
+    @property
+    def num_variables(self) -> int:
+        return self.q_mat.shape[0]
 
 
 @lru_cache

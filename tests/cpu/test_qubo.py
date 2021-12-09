@@ -85,3 +85,13 @@ class TestQubo:
         assert qubo.energy_diff(flipped, k) == qubo.adjust_energy_diff(
             state, k, energy_diff_k, j
         )
+
+    @pytest.mark.parametrize("num_variables", [3, 8, 11])
+    def test_correctly_defines_its_number_of_variables(self, num_variables):
+        rng = np.random.default_rng(42)
+
+        q_mat = rng.random((num_variables, num_variables))
+        q_mat += q_mat.T
+
+        qubo = qubo_from_matrix(q_mat)
+        assert qubo.num_variables == num_variables
