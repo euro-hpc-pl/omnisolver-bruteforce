@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools-cuda", "setuptools", "wheel", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnisolver-bruteforce"
+version = "0.0.1"
+
+[tool.setuptools.packages]
+find = {exclude=["instances"]}
+
+[tool.black]
+line-length = 100
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.venv
+)/
+'''
