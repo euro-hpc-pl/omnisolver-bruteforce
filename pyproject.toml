@@ -5,6 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "omnisolver-bruteforce"
 version = "0.0.1"
+dependencies = [
+    "dimod ~= 0.12",
+    "numpy ~= 1.24"
+]
 
 [tool.setuptools.packages]
 find = {exclude=["instances"]}
