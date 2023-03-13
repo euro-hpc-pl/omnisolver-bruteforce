@@ -16,6 +16,20 @@ def _convert_int_to_sample(val, num_variables):
 
 class BruteforceGPUSampler(Sampler):
     def sample(self, bqm, num_states, suffix_size, grid_size, block_size, dtype=np.float32):
+        """Solve Binary Quadratic Model using exhaustive (bruteforce) search on the GPU.
+
+        :param bqm: Binary Quadratic Model instance to solve.
+        :param num_states: number of lowest energy states to compute.
+        :param suffix_size: exponent l such that 2 ** l is the number of temporarily stored
+        :param grid_size: number of blocks for the custom kernels. Note that this parameter
+            does not affect the grid on which the Thrust kernels are launched.
+        :param block_size: number of threads per block for custom kerneles. Note that this
+            parameter does not affect the grid on which the Thrust kernels are launched.
+        :param dtype: datatype to use, either np.float32 or np.float64. The default is
+            np.flaot32 which on most GPU is significantly faster then 64-bit floating point
+            numbers.
+        :returns: sample set containing num_states samples.
+        """
         if bqm.vartype == Vartype.SPIN:
             return self.sample(
                 bqm.change_vartype("BINARY", inplace=False),
