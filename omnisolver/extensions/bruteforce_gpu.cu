@@ -5,7 +5,6 @@
 #include <sstream>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include "error_handling.h"
 #include "vectors.h"
 
 // Basic error checking (used only for kernel launches)
