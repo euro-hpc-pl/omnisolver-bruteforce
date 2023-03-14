@@ -197,7 +197,7 @@ void search(
     auto best_spectrum_it = zip(best_states, best_energies);
 
     // Number of chunks s.t. num_chunk * chunk_size = 2 ** N.
-    uint64_t num_chunks = 1 << (N - suffix_size >= 0);
+    uint64_t num_chunks = 1 << (N - suffix_size);
 
     // Initialize and check if it succeeded.
     init<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, chunk_size);
