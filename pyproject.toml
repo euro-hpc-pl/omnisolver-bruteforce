@@ -13,6 +13,9 @@ dependencies = [
     "numpy ~= 1.19.4"
 ]
 
+[project.entry-points."omnisolver"]
+bruteforce-gpu = "omnisolver.bruteforce.gpu"
+
 [tool.setuptools.packages]
 find = {exclude=["instances"]}
 
