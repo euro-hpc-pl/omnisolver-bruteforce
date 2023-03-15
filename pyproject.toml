@@ -3,8 +3,10 @@ requires = ["setuptools-cuda", "setuptools", "wheel", "cython", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
+readme = "README.md"
 requires-python = ">=3.7,<3.10"
 name = "omnisolver-bruteforce"
+description = "Bruteforce (a.k.a. exhaustive search) Plugin for Omnisolver"
 version = "0.0.1"
 dependencies = [
     "omnisolver ~= 0.0.3",
