@@ -8,7 +8,9 @@ version = "0.0.1"
 dependencies = [
     "omnisolver ~= 0.0.3",
     "dimod ~= 0.12",
-    "numpy ~= 1.24"
+    "numba ~= 0.56.4",
+    "pluggy ~= 0.13.1",
+    "numpy ~= 1.19.4"
 ]
 
 [tool.setuptools.packages]
