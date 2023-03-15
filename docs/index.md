@@ -1,6 +1,7 @@
 # Welcome to omnisolver-pt documentation!
 
-The `omnisolver-pt` is Omnisolver plugin implementing the Parallel Tempering algorithm.
+The `omnisolver-bruteforce` is Omnisolver plugin implementing the bruteforce (a.k.a exhaustive 
+search) algorithm.
 
 ## Installation
 
