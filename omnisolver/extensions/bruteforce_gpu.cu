@@ -243,7 +243,7 @@ void search(
             current_spectrum_it,
             current_spectrum_it + chunk_size,
             candidates_it,
-            energy_less_then(threshold)
+            energy_less_then<T>(threshold)
         );
 
         // This sort effectively combines the current approximation and candidates.
