@@ -1,4 +1,5 @@
 import typing
+from time import perf_counter
 
 import numpy as np
 from dimod import Sampler, SampleSet, Vartype
@@ -53,6 +54,8 @@ class BruteforceGPUSampler(Sampler):
         states_out = np.zeros(num_states, dtype=np.uint64)
         energies_out = np.zeros(num_states, dtype=dtype)
 
+        start_counter = perf_counter()
+
         gpu_search(
             qubo_mat,
             num_states,
@@ -63,9 +66,16 @@ class BruteforceGPUSampler(Sampler):
             suffix_size,
         )
 
+        solve_time_in_seconds = perf_counter() - start_counter
+
         samples = [_convert_int_to_sample(state, bqm.num_variables) for state in states_out]
 
-        result = SampleSet.from_samples(samples, bqm.vartype, energies_out + bqm.offset)
+        result = SampleSet.from_samples(
+            samples,
+            bqm.vartype,
+            energies_out + bqm.offset,
+            info={"solve_time_in_seconds": solve_time_in_seconds},
+        )
 
         return result.relabel_variables(
             {value: key for key, value in mapping.items()}, inplace=False
