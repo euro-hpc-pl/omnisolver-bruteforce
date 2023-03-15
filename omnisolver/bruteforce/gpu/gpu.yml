@@ -1,0 +1,28 @@
+schema_version: 1
+name: "bruteforce-gpu"
+sampler_class: "omnisolver.bruteforce.gpu.BruteforceGPUSampler"
+description: "Bruteforce (a.k.a exhaustive search) sampler using CUA-enabled GPU"
+
+init_args: []
+sample_args:
+  - name: "num_states"
+    help: "Size of the low energy spectrum to compute"
+    type: int
+    default: 100
+  - name: "suffix_size"
+    help: "Number of suffix bits that are fixed during all iterations"
+    type: int
+    default: 24
+  - name: "grid_size"
+    help: "Number of blocks in grid running bruteforce kernels"
+    type: int
+    default: 1024
+  - name: "block_size"
+    help: "Number of threads in each block running bruteforce kernels"
+    type: int
+    default: 256
+  - name: "dtype"
+    help: "Data type to use, either 'float' or 'double'"
+    type: str
+    choices: ["float", "double"]
+    default: "float"

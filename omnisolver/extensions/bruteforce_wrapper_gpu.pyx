@@ -19,7 +19,7 @@ cdef extern from "bruteforce_gpu.h":
         int block_per_grid,
         int threads_per_block,
         int suffix_size
-    )
+    ) except+
 
 
 def gpu_search(

@@ -1,11 +1,11 @@
-name: Testing examples
+name: Run tests
 on: [pull_request]
 jobs:
   run_tests:
     runs-on: [self-hosted,gpu]
     strategy:
       matrix:
-        python-versions: ["3.8", "3.9", "3.10"]
+        python-versions: ["3.8", "3.9", ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4

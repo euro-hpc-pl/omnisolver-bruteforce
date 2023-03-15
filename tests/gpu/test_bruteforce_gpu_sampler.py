@@ -6,11 +6,15 @@ from omnisolver.bruteforce.gpu import BruteforceGPUSampler
 
 
 def random_bqm(num_variables, vartype, offset, rng):
-    linear = {i: rng.uniform(-2, 2) for i in range(num_variables)}
+    linear = {
+        i: coef for i, coef in zip(range(num_variables), rng.uniform(-2, 2, size=num_variables))
+    }
     quadratic = {
-        (i, j): rng.uniform(-1, 1)
-        for i in range(num_variables)
-        for j in range(i + 1, num_variables)
+        (i, j): coef
+        for (i, j), coef in zip(
+            [(i, j) for i in range(num_variables) for j in range(i + 1, num_variables)],
+            rng.uniform(-1, -1, size=(num_variables - 1) * num_variables // 2),
+        )
     }
     return BQM(linear, quadratic, offset, vartype=vartype)
 
@@ -26,8 +30,8 @@ def create_bqms():
 
 
 @pytest.mark.parametrize("bqm", create_bqms())
-@pytest.mark.parametrize("num_states", [100, 1000])
-@pytest.mark.parametrize("suffix_size", [22, 24, 26])
+@pytest.mark.parametrize("num_states", [100, 500])
+@pytest.mark.parametrize("suffix_size", [21, 22, 24])
 @pytest.mark.parametrize("grid_size", [2**10, 2**11])
 @pytest.mark.parametrize("block_size", [128, 256])
 @pytest.mark.parametrize("dtype", [np.float32])

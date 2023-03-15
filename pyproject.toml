@@ -3,12 +3,19 @@ requires = ["setuptools-cuda", "setuptools", "wheel", "cython", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
+requires-python = ">=3.7,<3.10"
 name = "omnisolver-bruteforce"
 version = "0.0.1"
 dependencies = [
+    "omnisolver ~= 0.0.3",
     "dimod ~= 0.12",
-    "numpy ~= 1.24"
+    "numba ~= 0.56.4",
+    "pluggy ~= 0.13.1",
+    "numpy ~= 1.19.4"
 ]
+
+[project.entry-points."omnisolver"]
+bruteforce-gpu = "omnisolver.bruteforce.gpu"
 
 [tool.setuptools.packages]
 find = {exclude=["instances"]}
