@@ -1,4 +1,4 @@
-name: Testing examples
+name: Run tests
 on: [pull_request]
 jobs:
   run_tests:
