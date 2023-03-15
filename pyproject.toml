@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "omnisolver-bruteforce"
 version = "0.0.1"
 dependencies = [
+    "omnisolver ~= 0.0.3",
     "dimod ~= 0.12",
     "numpy ~= 1.24"
 ]
