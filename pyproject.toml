@@ -14,6 +14,15 @@ dependencies = [
     "numpy ~= 1.19.4"
 ]
 
+[project.optional-dependencies]
+docs = [
+    "sphinx~=6.1.3",
+    "sphinx-autoapi~=2.0.1",
+    "pydata-sphinx-theme~=0.13.1",
+    "sphinx-term~=0.1",
+    "myst-parser~=1.0.0"
+]
+
 [project.entry-points."omnisolver"]
 bruteforce-gpu = "omnisolver.bruteforce.gpu"
 
