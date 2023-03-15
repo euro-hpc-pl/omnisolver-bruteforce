@@ -6,11 +6,15 @@ from omnisolver.bruteforce.gpu import BruteforceGPUSampler
 
 
 def random_bqm(num_variables, vartype, offset, rng):
-    linear = {i: rng.uniform(-2, 2) for i in range(num_variables)}
+    linear = {
+        i: coef for i, coef in zip(range(num_variables), rng.uniform(-2, 2, size=num_variables))
+    }
     quadratic = {
-        (i, j): rng.uniform(-1, 1)
-        for i in range(num_variables)
-        for j in range(i + 1, num_variables)
+        (i, j): coef
+        for (i, j), coef in zip(
+            [(i, j) for i in range(num_variables) for j in range(i + 1, num_variables)],
+            rng.uniform(-1, -1, size=(num_variables - 1) * num_variables // 2),
+        )
     }
     return BQM(linear, quadratic, offset, vartype=vartype)
 
