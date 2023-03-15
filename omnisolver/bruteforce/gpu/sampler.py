@@ -77,9 +77,7 @@ class BruteforceGPUSampler(Sampler):
             info={"solve_time_in_seconds": solve_time_in_seconds},
         )
 
-        return result.relabel_variables(
-            {value: key for key, value in mapping.items()}, inplace=False
-        )
+        return result.relabel_variables(mapping, inplace=False)
 
     @property
     def parameters(self) -> typing.Dict[str, typing.Any]:
