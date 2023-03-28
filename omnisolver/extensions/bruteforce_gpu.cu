@@ -192,6 +192,17 @@ void search(
     // Analogously, device vectors for states.
     state_vector states(chunk_size), best_states(num_states + chunk_size);
 
+
+    // here
+    int blockSize;
+    int gridSize;
+
+    cudaOccupancyMaxPotentialBlockSize( &gridSize, &blockSize, init<T>, 0, 0);
+    std::cout << "Grid for init " << blockSize << " " << gridSize << " " << std::endl;
+    cudaOccupancyMaxPotentialBlockSize( &gridSize, &blockSize, single_step<T>, 0, 0);
+    std::cout << "Grid for single step " << blockSize << " " << gridSize << " " << std::endl;
+    // here ends
+
     // For easier iteration: tuple iterators over current and best spectrum
     auto current_spectrum_it = zip(states, energies);
     auto best_spectrum_it = zip(best_states, best_energies);
