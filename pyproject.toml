@@ -12,7 +12,7 @@ dependencies = [
     "dimod ~= 0.12",
     "numba ~= 0.56.4",
     "pluggy ~= 0.13.1",
-    "numpy ~= 1.19.4"
+    "numpy ~= 1.20.3"
 ]
 dynamic = ["version"]
 
@@ -22,7 +22,7 @@ docs = [
     "sphinx-autoapi~=2.0.1",
     "pydata-sphinx-theme~=0.13.1",
     "sphinx-term~=0.1",
-    "myst-parser~=1.0.0"
+    "myst-parser~=1.0.0",
 ]
 
 [project.entry-points."omnisolver"]
