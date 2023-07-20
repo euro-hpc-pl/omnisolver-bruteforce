@@ -33,14 +33,10 @@ class TestConversionBetweenBinaryAndGray:
 @pytest.mark.parametrize("num_bits", [10, 12, 16])
 class TestBijectionBetweenGrayAndBinary:
     def test_nth_gray_code_inverts_gray_code_index(self, num_bits):
-        assert all(
-            gray_code_index(nth_gray_number(n)) == n for n in range(2 ** num_bits)
-        )
+        assert all(gray_code_index(nth_gray_number(n)) == n for n in range(2**num_bits))
 
     def test_gray_code_index_inverts_nth_gray_code(self, num_bits):
-        assert all(
-            nth_gray_number(gray_code_index(n)) == n for n in range(2 ** num_bits)
-        )
+        assert all(nth_gray_number(gray_code_index(n)) == n for n in range(2**num_bits))
 
 
 def _binary_array_to_number(arr):
@@ -57,12 +53,12 @@ def test_iterating_algorithm_l_yields_all_gray_codes(num_bits):
     state = np.zeros(num_bits, dtype=np.int8)
     produced_numbers = [_binary_array_to_number(state)]
 
-    for _ in range(2 ** num_bits - 1):
+    for _ in range(2**num_bits - 1):
         bit_to_flip = focus_vector[0] % num_bits
         state[bit_to_flip] = 1 - state[bit_to_flip]
         advance_focus_vector(focus_vector)
         produced_numbers.append(_binary_array_to_number(state))
 
     np.testing.assert_array_equal(
-        produced_numbers, [nth_gray_number(n) for n in range(2 ** num_bits)]
+        produced_numbers, [nth_gray_number(n) for n in range(2**num_bits)]
     )

@@ -1,8 +1,8 @@
-from dimod import BQM, Vartype
-from omnisolver.bruteforce.gpu.distributed import DistributedBruteforceGPUSampler
-from omnisolver.bruteforce.gpu import BruteforceGPUSampler
+from dimod import BQM
 from numpy.random import default_rng
-import numpy as np
+
+from omnisolver.bruteforce.gpu import BruteforceGPUSampler
+from omnisolver.bruteforce.gpu.distributed import DistributedBruteforceGPUSampler
 
 
 def random_bqm(num_variables, vartype, offset, rng):
@@ -18,6 +18,7 @@ def random_bqm(num_variables, vartype, offset, rng):
     }
     return BQM(linear, quadratic, offset, vartype=vartype)
 
+
 NUM_VARIABLES = 40
 
 
@@ -32,12 +33,7 @@ def main():
 
     start = time.perf_counter()
     result = sampler.sample(
-        bqm,
-        num_states=100,
-        num_fixed_vars=1,
-        suffix_size=25,
-        grid_size=1024,
-        block_size=1024
+        bqm, num_states=100, num_fixed_vars=1, suffix_size=25, grid_size=1024, block_size=1024
     )
     duration = time.perf_counter() - start
     distributed_en = [entry.energy for entry in result.data()]
@@ -46,11 +42,7 @@ def main():
 
     start = time.perf_counter()
     result2 = sampler2.sample(
-        bqm,
-        num_states=100,
-        suffix_size=25,
-        grid_size=2 ** 12,
-        block_size=512
+        bqm, num_states=100, suffix_size=25, grid_size=2**12, block_size=512
     )
     duration = time.perf_counter() - start
     single_en = [entry.energy for entry in result2.data()]
