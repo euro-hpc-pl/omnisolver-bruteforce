@@ -49,9 +49,8 @@ class DistributedBruteforceGPUSampler(Sampler):
             for fixed_vars in subproblems
         ]
 
-        solve_time_in_seconds = perf_counter() - start_counter
-
         subsolutions = [ray.get(ref) for ref in refs]
+        solve_time_in_seconds = perf_counter() - start_counter
         result = concatenate(subsolutions).truncate(num_states)
         result.info["solve_time_in_seconds"] = solve_time_in_seconds
         return result
