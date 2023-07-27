@@ -4,7 +4,7 @@ from time import perf_counter
 import numpy as np
 from dimod import Sampler, SampleSet, Vartype
 
-from omnisolver.bruteforce.ext.gpu import gpu_search
+from omnisolver.bruteforce.ext.gpu import gpu_search, gpu_search_ground_only
 
 
 def _convert_int_to_sample(val, num_variables):
@@ -56,15 +56,25 @@ class BruteforceGPUSampler(Sampler):
 
         start_counter = perf_counter()
 
-        gpu_search(
-            qubo_mat,
-            num_states,
-            states_out,
-            energies_out,
-            grid_size,
-            block_size,
-            suffix_size,
-        )
+        if num_states == 1:  # Shortcut if we are only looking for a ground state
+            gpu_search_ground_only(
+                qubo_mat,
+                states_out,
+                energies_out,
+                grid_size,
+                block_size,
+                suffix_size,
+            )
+        else:
+            gpu_search(
+                qubo_mat,
+                num_states,
+                states_out,
+                energies_out,
+                grid_size,
+                block_size,
+                suffix_size,
+            )
 
         solve_time_in_seconds = perf_counter() - start_counter
 

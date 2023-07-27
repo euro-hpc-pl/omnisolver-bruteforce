@@ -24,6 +24,7 @@ inline void cuda_assert(cudaError_t code, const char *file, int line)
 }
 
 // Compute i-th Gray code.
+__host__ __device__
 uint64_t gray(uint64_t index) { return index ^ (index >> 1); }
 
 // Find First bit Set in a number.
@@ -55,14 +56,22 @@ int ffs(uint64_t number) {
 template <typename T>
 __device__ T energy_diff(T* qubo_row, int N, uint64_t state, int i) {
     int qi = (state >> i) & 1; // This is the i-th bit of state
-    T total = qubo_row[i];     // Start accumulating from the lineaer term
-
+    T total = qubo_row[i];     // Start accumulating from the linear term
+    uint32_t low = state & 0xFFFFFFFF;
+    uint32_t high = state >> 32;
     // Go through each bit of state
-    for(int j = 0; j < N; j++) {
+    for(int j = 0; j < 32 && j < N; j++) {
         if(i != j) { // except the one to flip, it's already accounted for
-            total += qubo_row[j] * (state & 1);
+            total += qubo_row[j] * (low % 2); //state;// (state & 1);
         }
-        state >>= 1; // move to next bit
+        low >>= 1; // move to next bit
+    }
+
+    for(int j=32; j < N; j++) {
+        if(i != j) { // except the one to flip, it's already accounted for
+            total += qubo_row[j] * (high % 2);
+        }
+        high >>= 1; // move to next bit
     }
 
     // When flipping from 0 to 1 there is nothing to do, otherwise we need
@@ -88,7 +97,7 @@ __device__ void _init(T* qubo, int N, uint64_t* states, T* energies, uint64_t in
     // most significant bits of state to 011.
     while(suffix > 0) {
         // Find first set (note: not our function, this one is CUDA's intrinsic)
-        uint64_t bit_in_suffix = __ffs(suffix);
+        uint64_t bit_in_suffix = __ffsll(suffix);
         // Compute bit index from the most significant position
         // Since we reduce suffix in each iteration, we have to store the offset
         // travelled so far in the `offset` variable.
@@ -144,6 +153,41 @@ __global__ void single_step(
         states[i] = state ^ (1L << bit_to_flip);
     }
 }
+
+// Kernel performing whole ground state (and only ground state) computation in a single step
+template <typename T>
+__global__ void find_ground(
+    T* qubo,
+    int N,
+    T* energies,
+    uint64_t* states,
+    uint64_t suffix_size
+) {
+    uint64_t chunk_size = 1 << suffix_size;
+    T tmp_energy, candidate_energy;
+    uint64_t tmp_state, candidate_state;
+    int bit_to_flip;
+
+    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
+        _init(qubo, N, states, energies, i);
+        candidate_energy = energies[i];
+        tmp_energy = candidate_energy;
+        candidate_state = states[i];
+        tmp_state = candidate_state;
+        for(uint64_t j=1; j < (1L << (N - suffix_size)); j++) {
+            bit_to_flip = __ffsll(gray(j) ^ gray(j - 1)) - 1;
+            tmp_energy = tmp_energy - energy_diff(qubo + N * bit_to_flip, N, tmp_state, bit_to_flip);
+            tmp_state = tmp_state ^ (1L << bit_to_flip);
+            if(tmp_energy < candidate_energy) {
+                candidate_energy = tmp_energy;
+                candidate_state = tmp_state;
+            }
+        }
+        states[i] = candidate_state;
+        energies[i] = candidate_energy;
+    }
+}
+
 
 // Predicate used in thrust::copy_if
 // Given a tuple (state, energy), copy this copule iff energy < threshold.
@@ -214,7 +258,7 @@ void search(
     );
 
     // Iterate in chunks in gray code order.
-    for(int i = 1; i < num_chunks; i++) {
+    for(uint64_t i = 1; i < num_chunks; i++) {
         // To compute bit to flip compute two consecutive gray codes and see at which
         // bit they differ. Subtract 1 because ffs counts from 1.
         int bit_to_flip = ffs(gray(i) ^ gray(i - 1)) - 1;
@@ -277,6 +321,50 @@ template void search(
     uint64_t num_states,
     uint64_t* states_out,
     float* energies_out,
+    int grid_size,
+    int block_size,
+    int suffix_size
+);
+
+template <typename T>
+void search_ground_only(
+    T* qubo,
+    int N,
+    uint64_t* states_out,
+    T* energies_out,
+    int grid_size,
+    int block_size,
+    int suffix_size
+) {
+    uint64_t chunk_size = 1L << suffix_size;
+    device_vector<T> qubo_gpu(qubo, qubo + N * N);
+
+    energy_vector<T> energies(chunk_size);
+    state_vector states(chunk_size);
+
+    find_ground<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, suffix_size);
+    cuda_error_check(cudaGetLastError());
+    cudaDeviceSynchronize();
+    thrust::sort_by_key(energies.begin(), energies.end(), states.begin());
+    thrust::copy(states.begin(), states.begin() + 1, states_out);
+    thrust::copy(energies.begin(), energies.begin() + 1, energies_out);
+}
+
+template void search_ground_only(
+    float* qubo,
+    int N,
+    uint64_t* states_out,
+    float* energies_out,
+    int grid_size,
+    int block_size,
+    int suffix_size
+);
+
+template void search_ground_only(
+    double* qubo,
+    int N,
+    uint64_t* states_out,
+    double* energies_out,
     int grid_size,
     int block_size,
     int suffix_size
