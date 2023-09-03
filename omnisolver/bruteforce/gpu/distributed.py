@@ -22,7 +22,15 @@ def _solve_subproblem(bqm, num_states, fixed_vars, suffix_size, grid_size, block
 
 class DistributedBruteforceGPUSampler(Sampler):
     def sample(
-        self, bqm, num_states, num_fixed_vars, suffix_size, grid_size, block_size, dtype=np.float32
+        self,
+        bqm,
+        num_states,
+        num_fixed_vars,
+        suffix_size,
+        grid_size,
+        block_size,
+        partial_diff_buffer_depth=1,
+        dtype=np.float32,
     ):
         if bqm.vartype == Vartype.SPIN:
             return self.sample(
@@ -32,6 +40,7 @@ class DistributedBruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                partial_diff_buffer_depth,
             ).change_vartype("SPIN", inplace=False)
 
         bqm, mapping = bqm.relabel_variables_as_integers()
@@ -44,7 +53,14 @@ class DistributedBruteforceGPUSampler(Sampler):
 
         refs = [
             _solve_subproblem.remote(
-                bqm, num_states, fixed_vars, suffix_size, grid_size, block_size, dtype
+                bqm,
+                num_states,
+                fixed_vars,
+                suffix_size,
+                grid_size,
+                block_size,
+                partial_diff_buffer_depth,
+                dtype,
             )
             for fixed_vars in subproblems
         ]

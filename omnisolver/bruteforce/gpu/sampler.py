@@ -16,7 +16,16 @@ def _convert_int_to_sample(val, num_variables):
 
 
 class BruteforceGPUSampler(Sampler):
-    def sample(self, bqm, num_states, suffix_size, grid_size, block_size, dtype=np.float32):
+    def sample(
+        self,
+        bqm,
+        num_states,
+        suffix_size,
+        grid_size,
+        block_size,
+        partial_diff_buff_depth=1,
+        dtype=np.float32,
+    ):
         """Solve Binary Quadratic Model using exhaustive (bruteforce) search on the GPU.
 
         :param bqm: Binary Quadratic Model instance to solve.
@@ -38,6 +47,7 @@ class BruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                partial_diff_buff_depth,
             ).change_vartype("SPIN", inplace=False)
 
         bqm, mapping = bqm.relabel_variables_as_integers()
@@ -64,6 +74,7 @@ class BruteforceGPUSampler(Sampler):
                 grid_size,
                 block_size,
                 suffix_size,
+                partial_diff_buff_depth,
             )
         else:
             gpu_search(

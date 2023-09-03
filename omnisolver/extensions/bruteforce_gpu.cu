@@ -81,6 +81,34 @@ __device__ __forceinline__ T energy_diff(T* qubo_row, int N, uint64_t state, int
     return (2 * qi - 1) * total;
 }
 
+template <typename T>
+__device__ __forceinline__ T energy_diff_reduced(T* qubo_row, int N, int offset, uint64_t state, int i, T common_part) {
+    int qi = (state >> i) & 1; // This is the i-th bit of state
+    T total = qubo_row[i] + common_part;     // Start accumulating from the linear term
+
+    uint32_t word = state & 0xFFFFFFFF;
+    uint32_t limit = N - offset;
+    // Go through each bit of state
+    for(int j = 0; j < 32 && j < limit; j++) {
+        if(i != j && (word % 2)) { // except the one to flip, it's already accounted for
+            total += qubo_row[j];
+        }
+        word /= 2; //>>= 1; // move to next bit
+    }
+
+    word = state >> 32;
+    for(int j=32; j < limit; j++) {
+        if(i != j && (word % 2)) { // except the one to flip, it's already accounted for
+            total += qubo_row[j];
+        }
+        word /= 2; // move to next bit
+    }
+
+    // When flipping from 0 to 1 there is nothing to do, otherwise we need
+    // to multiply the total by -1.
+    return (2 * qi - 1) * total;
+}
+
 // Initialize first states and energies for further processing.
 // The idea is as follows. Each state (which is N-bit number) is (logically) split into
 // two parts:
@@ -163,22 +191,42 @@ __global__ void find_ground(
     int N,
     T* energies,
     uint64_t* states,
-    uint64_t suffix_size
+    uint64_t suffix_size,
+    T* partial_diff_buffer,
+    int partial_diff_buffer_depth
 ) {
-    uint64_t chunk_size = 1 << suffix_size;
+    uint64_t chunk_size = 1L << suffix_size;
     T tmp_energy, candidate_energy;
     uint64_t tmp_state, candidate_state;
     int bit_to_flip;
+    T block_energy_part = 0.0;
 
     for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
-        _init(qubo, N, states, energies, i);
         candidate_energy = energies[i];
         tmp_energy = candidate_energy;
         candidate_state = states[i];
         tmp_state = candidate_state;
         for(uint64_t j=1; j < (1L << (N - suffix_size)); j++) {
             bit_to_flip = __ffsll(gray(j) ^ gray(j - 1)) - 1;
-            tmp_energy = tmp_energy - energy_diff(qubo + N * bit_to_flip, N, tmp_state, bit_to_flip);
+
+            if(bit_to_flip < partial_diff_buffer_depth) {
+                tmp_energy = tmp_energy - energy_diff_reduced(
+                    qubo + N * bit_to_flip,
+                    N,
+                    suffix_size,
+                    tmp_state,
+                    bit_to_flip,
+                    partial_diff_buffer[bit_to_flip * chunk_size + i]
+                );
+                tmp_energy = tmp_energy;
+            } else {
+                tmp_energy = tmp_energy - energy_diff(
+                    qubo + N * bit_to_flip,
+                    N,
+                    tmp_state,
+                    bit_to_flip
+                );
+            }
             tmp_state = tmp_state ^ (1L << bit_to_flip);
             if(tmp_energy < candidate_energy) {
                 candidate_energy = tmp_energy;
@@ -187,6 +235,37 @@ __global__ void find_ground(
         }
         states[i] = candidate_state;
         energies[i] = candidate_energy;
+    }
+}
+
+
+template <typename T>
+__global__ void _initialize_partial_diff_buffer(
+    T* qubo,
+    int N,
+    uint64_t* states,
+    uint64_t suffix_size,
+    T* partial_diff_buffer,
+    int partial_diff_buffer_depth
+) {
+    uint64_t chunk_size = 1L << suffix_size;
+    uint64_t shifted_state, tmp_state;
+    T total;
+    T* qubo_row;
+
+    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
+        shifted_state = states[i] >> (N - suffix_size);
+        for(int bit_to_flip=0; bit_to_flip < partial_diff_buffer_depth; bit_to_flip++) {
+            total = 0;
+            tmp_state = shifted_state;
+            qubo_row = qubo + N * bit_to_flip;
+            for(int k=N-suffix_size; k < N; k++) {
+                if(tmp_state % 2) total += qubo_row[k];
+                tmp_state /= 2;
+            }
+
+            partial_diff_buffer[bit_to_flip * chunk_size + i] = total;
+        }
     }
 }
 
@@ -336,7 +415,8 @@ void search_ground_only(
     T* energies_out,
     int grid_size,
     int block_size,
-    int suffix_size
+    int suffix_size,
+    int partial_diff_buffer_depth
 ) {
     uint64_t chunk_size = 1L << suffix_size;
     device_vector<T> qubo_gpu(qubo, qubo + N * N);
@@ -344,7 +424,25 @@ void search_ground_only(
     energy_vector<T> energies(chunk_size);
     state_vector states(chunk_size);
 
-    find_ground<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, suffix_size);
+    energy_vector<T> partial_diff_buffer(partial_diff_buffer_depth * chunk_size);
+
+    init<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, chunk_size);
+    cuda_error_check(cudaGetLastError());
+    cudaDeviceSynchronize();
+
+    _initialize_partial_diff_buffer<<<grid_size, block_size>>>((T*)qubo_gpu, N, states, suffix_size, (T*) partial_diff_buffer, partial_diff_buffer_depth);
+    cuda_error_check(cudaGetLastError());
+    cudaDeviceSynchronize();
+
+    find_ground<<<grid_size, block_size>>>(
+        (T*)qubo_gpu,
+        N,
+        (T*)energies,
+        states,
+        suffix_size,
+        (T*)partial_diff_buffer,
+        partial_diff_buffer_depth
+    );
     cuda_error_check(cudaGetLastError());
     cudaDeviceSynchronize();
     thrust::sort_by_key(energies.begin(), energies.end(), states.begin());
@@ -359,7 +457,8 @@ template void search_ground_only(
     float* energies_out,
     int grid_size,
     int block_size,
-    int suffix_size
+    int suffix_size,
+    int partial_diff_buffer_depth
 );
 
 template void search_ground_only(
@@ -369,5 +468,6 @@ template void search_ground_only(
     double* energies_out,
     int grid_size,
     int block_size,
-    int suffix_size
+    int suffix_size,
+    int partial_diff_buffer_depth
 );

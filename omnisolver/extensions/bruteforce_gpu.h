@@ -18,5 +18,6 @@ void search_ground_only(
     T* energies_out,
     int blocks_per_grid,
     int threads_per_block,
-    int suffix_size
+    int suffix_size,
+    int partial_diff_buff_depth
 );
