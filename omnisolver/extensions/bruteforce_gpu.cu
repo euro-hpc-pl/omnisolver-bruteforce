@@ -54,24 +54,26 @@ int ffs(uint64_t number) {
 // One can easily verify that to compute the difference above we need only the
 // i-th row of QUBO, and hence we already pass this row instead of computign the offset.
 template <typename T>
-__device__ T energy_diff(T* qubo_row, int N, uint64_t state, int i) {
+__device__ __forceinline__ T energy_diff(T* qubo_row, int N, uint64_t state, int i) {
     int qi = (state >> i) & 1; // This is the i-th bit of state
     T total = qubo_row[i];     // Start accumulating from the linear term
-    uint32_t low = state & 0xFFFFFFFF;
-    uint32_t high = state >> 32;
+
+    uint32_t word = state & 0xFFFFFFFF;
+
     // Go through each bit of state
     for(int j = 0; j < 32 && j < N; j++) {
-        if(i != j) { // except the one to flip, it's already accounted for
-            total += qubo_row[j] * (low % 2); //state;// (state & 1);
+        if(i != j && (word % 2)) { // except the one to flip, it's already accounted for
+            total += qubo_row[j];
         }
-        low >>= 1; // move to next bit
+        word /= 2; //>>= 1; // move to next bit
     }
 
+    word = state >> 32;
     for(int j=32; j < N; j++) {
-        if(i != j) { // except the one to flip, it's already accounted for
-            total += qubo_row[j] * (high % 2);
+        if(i != j && (word % 2)) { // except the one to flip, it's already accounted for
+            total += qubo_row[j];
         }
-        high >>= 1; // move to next bit
+        word /= 2; // move to next bit
     }
 
     // When flipping from 0 to 1 there is nothing to do, otherwise we need
