@@ -28,7 +28,9 @@ cdef extern from "bruteforce_gpu.h":
         T* energies_out,
         int blocks_per_grid,
         int threads_per_block,
-        int suffix_size
+        int suffix_size,
+        int num_steps_per_kernel,
+        int partial_diff_buff_depth
     ) except+
 
 def gpu_search(
@@ -57,7 +59,9 @@ def gpu_search_ground_only(
     real[::1] energies_out,
     int grid_size,
     int block_size,
-    int suffix_size
+    int suffix_size,
+    int num_steps_per_kernel=16,
+    int partial_diff_buffer_depth=1
 ):
     search_ground_only(
         &qubo[0, 0],
@@ -66,5 +70,7 @@ def gpu_search_ground_only(
         &energies_out[0],
         grid_size,
         block_size,
-        suffix_size
+        suffix_size,
+        num_steps_per_kernel,
+        partial_diff_buffer_depth
     )

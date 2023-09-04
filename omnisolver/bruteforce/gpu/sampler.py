@@ -23,6 +23,7 @@ class BruteforceGPUSampler(Sampler):
         suffix_size,
         grid_size,
         block_size,
+        num_steps_per_kernel=16,
         partial_diff_buff_depth=1,
         dtype=np.float32,
     ):
@@ -47,7 +48,9 @@ class BruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                num_steps_per_kernel,
                 partial_diff_buff_depth,
+                dtype,
             ).change_vartype("SPIN", inplace=False)
 
         bqm, mapping = bqm.relabel_variables_as_integers()
@@ -74,6 +77,7 @@ class BruteforceGPUSampler(Sampler):
                 grid_size,
                 block_size,
                 suffix_size,
+                num_steps_per_kernel,
                 partial_diff_buff_depth,
             )
         else:
