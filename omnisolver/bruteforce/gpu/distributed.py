@@ -10,12 +10,31 @@ from .sampler import BruteforceGPUSampler
 
 
 @ray.remote(num_gpus=1)
-def _solve_subproblem(bqm, num_states, fixed_vars, suffix_size, grid_size, block_size, dtype):
+def _solve_subproblem(
+    bqm,
+    num_states,
+    fixed_vars,
+    suffix_size,
+    grid_size,
+    block_size,
+    num_steps_per_kernel,
+    partial_diff_buffer_depth,
+    dtype,
+):
     new_bqm = bqm.copy()
     new_bqm.fix_variables(fixed_vars)
 
     sampler = BruteforceGPUSampler()
-    result = sampler.sample(new_bqm, num_states, suffix_size, grid_size, block_size, dtype)
+    result = sampler.sample(
+        new_bqm,
+        num_states,
+        suffix_size,
+        grid_size,
+        block_size,
+        num_steps_per_kernel,
+        partial_diff_buffer_depth,
+        dtype,
+    )
 
     return append_variables(result, fixed_vars)
 
@@ -29,6 +48,7 @@ class DistributedBruteforceGPUSampler(Sampler):
         suffix_size,
         grid_size,
         block_size,
+        num_steps_per_kernel=1,
         partial_diff_buffer_depth=1,
         dtype=np.float32,
     ):
@@ -40,6 +60,7 @@ class DistributedBruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                num_steps_per_kernel,
                 partial_diff_buffer_depth,
             ).change_vartype("SPIN", inplace=False)
 
@@ -59,6 +80,7 @@ class DistributedBruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                num_steps_per_kernel,
                 partial_diff_buffer_depth,
                 dtype,
             )
