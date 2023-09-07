@@ -152,7 +152,7 @@ __global__ void init(
     uint64_t* states,
     uint64_t states_in_chunk
 ) {
-    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < states_in_chunk; i += blockDim.x * gridDim.x) {
+    for(uint64_t i=blockIdx.x * blockDim.x + threadIdx.x; i < states_in_chunk; i += blockDim.x * gridDim.x) {
         _init(qubo, N, states, energies, i);
     }
 }
@@ -172,7 +172,7 @@ __global__ void single_step(
 ) {
     T* qubo_row = qubo + N * bit_to_flip;
 
-    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < states_in_chunk; i += blockDim.x * gridDim.x) {
+    for(uint64_t i=blockIdx.x * blockDim.x + threadIdx.x; i < states_in_chunk; i += blockDim.x * gridDim.x) {
         uint64_t state = states[i];
         T energy = energies[i];
         energies[i] = energy - energy_diff(qubo_row, N, state, bit_to_flip);
@@ -209,7 +209,7 @@ __global__ void find_ground(
     int bit_to_flip;
     int qi;
 
-    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
+    for(uint64_t i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
         candidate_energy = best_energies[i];
         tmp_energy = energies[i];
         candidate_state = best_states[i];
@@ -261,7 +261,7 @@ __global__ void _initialize_partial_diff_buffer(
     T total;
     T* qubo_row;
 
-    for(int i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
+    for(uint64_t i=blockIdx.x * blockDim.x + threadIdx.x; i < chunk_size; i += blockDim.x * gridDim.x) {
         shifted_state = states[i] >> (N - suffix_size);
         for(int bit_to_flip=0; bit_to_flip < partial_diff_buffer_depth; bit_to_flip++) {
             total = 0;
