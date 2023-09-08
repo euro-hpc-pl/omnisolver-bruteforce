@@ -24,7 +24,7 @@ class BruteforceGPUSampler(Sampler):
         grid_size,
         block_size,
         num_steps_per_kernel=16,
-        partial_diff_buff_depth=1,
+        partial_diff_buffer_depth=1,
         dtype=np.float32,
     ):
         """Solve Binary Quadratic Model using exhaustive (bruteforce) search on the GPU.
@@ -49,7 +49,7 @@ class BruteforceGPUSampler(Sampler):
                 grid_size,
                 block_size,
                 num_steps_per_kernel,
-                partial_diff_buff_depth,
+                partial_diff_buffer_depth,
                 dtype,
             ).change_vartype("SPIN", inplace=False)
 
@@ -78,7 +78,7 @@ class BruteforceGPUSampler(Sampler):
                 block_size,
                 suffix_size,
                 num_steps_per_kernel,
-                partial_diff_buff_depth,
+                partial_diff_buffer_depth,
             )
         else:
             gpu_search(
