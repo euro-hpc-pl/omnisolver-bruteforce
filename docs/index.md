@@ -1,49 +1,91 @@
-# Welcome to omnisolver-pt documentation!
+---
+hide:
+  - navigation
+---
 
-The `omnisolver-bruteforce` is Omnisolver plugin implementing the bruteforce (a.k.a exhaustive 
-search) algorithm.
+<p align="center">
+    <a href="https://github.com/euro-hpc-pl/omnisolver"><img src="assets/logo-large.png" alt="Omnisolver"></a>
+</p>
 
-## Installation
+---
 
-Currently, the `omnisolver-bruteforce` package requires working CUDA installation.
+<h1></h1>
 
-To install the plugin first set the `CUDAHOME` environmental library to your CUDA instalaltion location, e.g.:
+<p align="center">
+    <a href="https://github.com/euro-hpc-pl/omnisolver/actions/workflows/quality_checks.yml">
+    <img src="https://github.com/euro-hpc-pl/omnisolver/actions/workflows/quality_checks.yml/badge.svg" alt="Tests"/>
+    </a>
+<a href="https://euro-hpc-pl.github.io/omnisolver">
+<img alt="Docs" src="https://img.shields.io/github/actions/workflow/status/euro-hpc-pl/omnisolver/quality_checks.yml?label=Docs">
+</a>
+</p>
 
-```shell
-# Rmember, your actual location  may vary!
-export CUDAHOME=/usr/local/cuda
+**Documentation:** https://euro-hpc-pl.github.io/omnisolver 
+
+**Source code:** https://github.com/euro-hpc-pl/omnisolver
+
+---
+
+Omnisolver is a collection of Binary Quadratic Model solvers and a framework for implementing them.
+
+
+
+## Why Omnisolver?
+
+### Benefits for the end-users
+
+Omnisolver contains a selection of standard and more sophisticated algorithms for solving BQMs. All solvers are available through intuitive CLI or from Python scripts as dimod based Samplers.
+
+### Benefits for solver creators
+
+Omnisolver allows developer to focus on algorithms instead of common tasks like handling input/output or creating CLI.
+
+## Quickstart
+
+<!-- termynal -->
+
+```
+# Install base omnisolver package
+$ pip install omnisolver
+---> 100%
+Successfuly installed omnisolver
+# Install chosen plugins (e.g. parallel-tempering solver)
+$ pip install omnisolver-pt
+---> 100%
+Successfuly installed omnisolver-pt
+# Create an instance file in COOrdinate format
+$ echo "0 1 1.0
+> 1 2 1.0
+> 2 0 1.0" > instance.txt
+# Run solver
+$ omnisolver pt --vartype SPIN instance.txt
+0,1,2,energy,num_occurrences
+1,-1,-1,-1.0,1
 ```
 
-and then run:
+## What's next?
 
-```shell
-pip install omnisolver-bruteforce
-```
+Here are some resources to get you started:
 
-> **Warning**
-> If you don't set the `CUDAHOME` directory, an attempt will be made to deduce it based on the location of your `nvcc` compiler.
-> However, this process might not work in all the cases and should not be relied on.
+- Start with user guide to learn about the installation methods and general usage patterns.
+- Discover available solvers in our plugin list.
+- If you are interested in developing your own solver, or are interested in in-depth details of how the Omnisolver
+  works, check our solver creator guide and reference manual.
 
-## Command line usage
+## Citing
+
+If you used Omnisolver in your research, consider citing it in your paper.
+You can use the following BibTeX entry:
+
 ```text
-usage: omnisolver bruteforce-gpu [-h] [--output OUTPUT] [--vartype {SPIN,BINARY}] [--num_states NUM_STATES] [--suffix_size SUFFIX_SIZE] [--grid_size GRID_SIZE]
-                                 [--block_size BLOCK_SIZE] [--dtype {float,double}]
-                                 input
-
-Bruteforce (a.k.a exhaustive search) sampler using CUA-enabled GPU
-
-positional arguments:
-  input                 Path of the input BQM file in COO format. If not specified, stdin is used.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --output OUTPUT       Path of the output file. If not specified, stdout is used.
-  --vartype {SPIN,BINARY}
-                        Variable type
-  --num_states NUM_STATES
-```
-
-## Documentation
-```{toctree}
-:maxdepth: 1
+@article{omnisolver2023,
+    title = {Omnisolver: An extensible interface to Ising spin–glass and QUBO solvers},
+    journal = {SoftwareX},
+    volume = {24},
+    pages = {101559},
+    year = {2023},
+    doi = {https://doi.org/10.1016/j.softx.2023.101559},
+    url = {https://www.softxjournal.com/article/S2352-7110(23)00255-8/},
+    author = {Konrad Jałowiecki and {\L}ukasz Pawela},
+}
 ```
