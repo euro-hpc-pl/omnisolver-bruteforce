@@ -1,0 +1,6 @@
+BasedOnStyle: WebKit
+AlignAfterOpenBracket: BlockIndent
+ColumnLimit: 100
+BinPackParameters: false
+BinPackArguments: false
+IncludeBlocks: Regroup
