@@ -91,7 +91,7 @@ class DistributedBruteforceGPUSampler(Sampler):
         solve_time_in_seconds = perf_counter() - start_counter
         result = concatenate(subsolutions).truncate(num_states)
         result.info["solve_time_in_seconds"] = solve_time_in_seconds
-        return result
+        return result.relabel_variables(mapping)
 
     @property
     def parameters(self) -> typing.Dict[str, typing.Any]:
