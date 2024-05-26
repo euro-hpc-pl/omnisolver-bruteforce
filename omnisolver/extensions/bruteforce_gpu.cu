@@ -1,8 +1,6 @@
 // Implementation of exhaustive search using a CUDA--enabled GPU.
 #include "vectors.h"
 
-#include <bit>
-#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <thrust/execution_policy.h>
@@ -450,6 +448,9 @@ void search_ground_only(
     energy_vector<T> prefix_diff_buffer(num_steps_per_kernel);
     energy_vector<T> partial_diff_buffer(partial_diff_buffer_depth * chunk_size);
 
+    num_steps_per_kernel = std::min(long(num_steps_per_kernel), 1L << (N - suffix_size));
+
+
     std::vector<int> src_bit_flip_buffer(num_steps_per_kernel);
     std::vector<T> src_prefix_diff_buffer(num_steps_per_kernel);
 
@@ -476,7 +477,9 @@ void search_ground_only(
 
     base_energy = 0;
     base_state = 0;
+
     for (uint64_t i = 0; i < (1L << (N - suffix_size)) / num_steps_per_kernel; i++) {
+        cudaDeviceSynchronize();
         for (uint64_t j = 0; j < num_steps_per_kernel; j++) {
             counter += 1;
             next_gray_code = gray(counter);
@@ -488,7 +491,6 @@ void search_ground_only(
                     src_prefix_diff_buffer[j] += qubo[N * bit_to_flip + k];
                 }
             }
-
             last_gray_code = next_gray_code;
             base_state ^= (1L << src_bit_flip_buffer[j]);
         }
