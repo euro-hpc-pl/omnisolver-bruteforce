@@ -11,12 +11,14 @@ void search(
 );
 
 template <typename T>
-void search(
+void search_ground_only(
     T* qubo,
     int N,
-    T* energies_out,
     uint64_t* states_out,
-    uint64_t num_states_in_chunk,
+    T* energies_out,
     int blocks_per_grid,
-    int threads_per_block
+    int threads_per_block,
+    int suffix_size,
+    int num_steps_per_kernel,
+    int partial_diff_buff_depth
 );

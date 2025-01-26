@@ -4,15 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 readme = "README.md"
-requires-python = ">=3.7,<3.10"
+requires-python = ">=3.10"
 name = "omnisolver-bruteforce"
 description = "Bruteforce (a.k.a. exhaustive search) Plugin for Omnisolver"
 dependencies = [
-    "omnisolver ~= 0.0.3",
+    "omnisolver >= 0.0.4",
     "dimod ~= 0.12",
-    "numba ~= 0.56.4",
-    "pluggy ~= 0.13.1",
-    "numpy ~= 1.19.4"
+    "numba ~= 0.58",
+    "numpy ~= 2.0"
 ]
 dynamic = ["version"]
 
@@ -22,7 +21,7 @@ docs = [
     "sphinx-autoapi~=2.0.1",
     "pydata-sphinx-theme~=0.13.1",
     "sphinx-term~=0.1",
-    "myst-parser~=1.0.0"
+    "myst-parser~=1.0.0",
 ]
 
 [project.entry-points."omnisolver"]

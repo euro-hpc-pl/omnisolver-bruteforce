@@ -4,7 +4,7 @@ from time import perf_counter
 import numpy as np
 from dimod import Sampler, SampleSet, Vartype
 
-from omnisolver.bruteforce.ext.gpu import gpu_search
+from omnisolver.bruteforce.ext.gpu import gpu_search, gpu_search_ground_only
 
 
 def _convert_int_to_sample(val, num_variables):
@@ -16,7 +16,17 @@ def _convert_int_to_sample(val, num_variables):
 
 
 class BruteforceGPUSampler(Sampler):
-    def sample(self, bqm, num_states, suffix_size, grid_size, block_size, dtype=np.float32):
+    def sample(
+        self,
+        bqm,
+        num_states,
+        suffix_size,
+        grid_size,
+        block_size,
+        num_steps_per_kernel=16,
+        partial_diff_buffer_depth=1,
+        dtype=np.float32,
+    ):
         """Solve Binary Quadratic Model using exhaustive (bruteforce) search on the GPU.
 
         :param bqm: Binary Quadratic Model instance to solve.
@@ -38,6 +48,9 @@ class BruteforceGPUSampler(Sampler):
                 suffix_size,
                 grid_size,
                 block_size,
+                num_steps_per_kernel,
+                partial_diff_buffer_depth,
+                dtype,
             ).change_vartype("SPIN", inplace=False)
 
         bqm, mapping = bqm.relabel_variables_as_integers()
@@ -56,15 +69,27 @@ class BruteforceGPUSampler(Sampler):
 
         start_counter = perf_counter()
 
-        gpu_search(
-            qubo_mat,
-            num_states,
-            states_out,
-            energies_out,
-            grid_size,
-            block_size,
-            suffix_size,
-        )
+        if num_states == 1:  # Shortcut if we are only looking for a ground state
+            gpu_search_ground_only(
+                qubo_mat,
+                states_out,
+                energies_out,
+                grid_size,
+                block_size,
+                suffix_size,
+                num_steps_per_kernel,
+                partial_diff_buffer_depth,
+            )
+        else:
+            gpu_search(
+                qubo_mat,
+                num_states,
+                states_out,
+                energies_out,
+                grid_size,
+                block_size,
+                suffix_size,
+            )
 
         solve_time_in_seconds = perf_counter() - start_counter
 

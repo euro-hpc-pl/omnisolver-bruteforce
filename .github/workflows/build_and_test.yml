@@ -5,8 +5,13 @@ jobs:
     runs-on: [self-hosted,gpu]
     strategy:
       matrix:
-        python-versions: ["3.8", "3.9", ]
+        python-versions: ["3.10", "3.11"]
     steps:
+      - uses: Jimver/cuda-toolkit@v0.2.20
+        id: cuda-toolkit
+        with:
+          cuda: '12.5.0'
+          log-file-suffix: '${{ matrix.python-versions }}.txt'
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
