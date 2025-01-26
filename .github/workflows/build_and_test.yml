@@ -11,6 +11,7 @@ jobs:
         id: cuda-toolkit
         with:
           cuda: '12.5.0'
+          log-file-suffix: '${{matrix.python-version}}.txt'
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
