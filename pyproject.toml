@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 name = "omnisolver-bruteforce"
 description = "Bruteforce (a.k.a. exhaustive search) Plugin for Omnisolver"
 dependencies = [
-    "omnisolver >= 0.0.3",
+    "omnisolver >= 0.0.4",
     "dimod ~= 0.12",
     "numba ~= 0.58",
-    "numpy ~= 1.26"
+    "numpy ~= 2.0"
 ]
 dynamic = ["version"]
 
