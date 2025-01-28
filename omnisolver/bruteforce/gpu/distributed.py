@@ -4,7 +4,7 @@ from time import perf_counter
 
 import numpy as np
 import ray
-from dimod import Sampler, Vartype, append_variables, concatenate
+from dimod import Sampler, Vartype, append_variables, concatenate, BQM
 
 from .sampler import BruteforceGPUSampler
 
@@ -21,6 +21,7 @@ def _solve_subproblem(
     partial_diff_buffer_depth,
     dtype,
 ):
+    bqm = BQM.from_serializable(bqm)
     new_bqm = bqm.copy()
     new_bqm.fix_variables(fixed_vars)
 
@@ -74,7 +75,7 @@ class DistributedBruteforceGPUSampler(Sampler):
 
         refs = [
             _solve_subproblem.remote(
-                bqm,
+                bqm.to_serializable(),
                 num_states,
                 fixed_vars,
                 suffix_size,
