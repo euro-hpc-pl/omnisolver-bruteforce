@@ -38,7 +38,9 @@ class BruteforceGPUSampler(Sampler):
             parameter does not affect the grid on which the Thrust kernels are launched.
         :param dtype: datatype to use, either np.float32 or np.float64. The default is
             np.flaot32 which on most GPU is significantly faster then 64-bit floating point
-            numbers.
+            numbers. For `num_states == 1`, the GPU backend automatically enables periodic
+            numeric re-anchoring when using `np.float32` and large models (`N >= 40`) to reduce
+            drift from long chains of incremental energy updates.
         :returns: sample set containing num_states samples.
         """
         if bqm.vartype == Vartype.SPIN:

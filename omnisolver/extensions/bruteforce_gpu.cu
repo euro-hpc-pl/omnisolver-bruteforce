@@ -1,10 +1,12 @@
 // Implementation of exhaustive search using a CUDA--enabled GPU.
 #include "vectors.h"
 
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
+#include <type_traits>
 
 // Basic error checking (used only for kernel launches)
 // It should throw an instance of std::runtime_error containing the decoded
@@ -116,6 +118,37 @@ energy_diff_reduced(T* qubo_row, int N, int offset, uint64_t state, int i, T com
     return (2 * qi - 1) * total;
 }
 
+template <typename T>
+__device__ __forceinline__ T exact_energy_from_state(T* qubo, int N, uint64_t state)
+{
+    double total = 0.0;
+
+    for (int i = 0; i < N; i++) {
+        if (((state >> i) & 1) == 0) {
+            continue;
+        }
+
+        T* qubo_row = qubo + N * i;
+        total += static_cast<double>(qubo_row[i]);
+        for (int j = i + 1; j < N; j++) {
+            if ((state >> j) & 1) {
+                total += static_cast<double>(qubo_row[j]);
+            }
+        }
+    }
+
+    return static_cast<T>(total);
+}
+
+template <typename T>
+__device__ __forceinline__ void compensated_subtract(T& value, T& compensation, T delta)
+{
+    T y = -delta - compensation;
+    T t = value + y;
+    compensation = (t - value) - y;
+    value = t;
+}
+
 // Initialize first states and energies for further processing.
 // The idea is as follows. Each state (which is N-bit number) is (logically)
 // split into two parts: l-bit part specific to state k-bit part that changes
@@ -142,7 +175,7 @@ __device__ void _init(T* qubo, int N, uint64_t* states, T* energies, uint64_t in
         // Update energy
         energy -= energy_diff(qubo + N * bit_to_flip, N, state, bit_to_flip);
         // Actually flip bit
-        state = state | (1L << bit_to_flip);
+        state = state | (1ULL << bit_to_flip);
         // Move to next bit in suffix
         suffix >>= bit_in_suffix;
         // Move the offset
@@ -179,7 +212,41 @@ __global__ void single_step(
         uint64_t state = states[i];
         T energy = energies[i];
         energies[i] = energy - energy_diff(qubo_row, N, state, bit_to_flip);
-        states[i] = state ^ (1L << bit_to_flip);
+        states[i] = state ^ (1ULL << bit_to_flip);
+    }
+}
+
+template <typename T>
+__global__ void
+reanchor_energies(T* qubo, int N, uint64_t* states, T* energies, uint64_t states_in_chunk)
+{
+    for (uint64_t i = thread_id(); i < states_in_chunk; i += grid_size()) {
+        energies[i] = exact_energy_from_state(qubo, N, states[i]);
+    }
+}
+
+template <typename T>
+__global__ void refresh_best_from_current(
+    T* energies,
+    uint64_t* states,
+    T* best_energies,
+    uint64_t* best_states,
+    uint64_t states_in_chunk
+)
+{
+    for (uint64_t i = thread_id(); i < states_in_chunk; i += grid_size()) {
+        if (energies[i] < best_energies[i]) {
+            best_energies[i] = energies[i];
+            best_states[i] = states[i];
+        }
+    }
+}
+
+template <typename T>
+__global__ void fill_with_zero(T* vector, uint64_t vector_size)
+{
+    for (uint64_t i = thread_id(); i < vector_size; i += grid_size()) {
+        vector[i] = static_cast<T>(0);
     }
 }
 
@@ -204,11 +271,14 @@ __global__ void find_ground(
     int* bit_buffer,
     T* prefix_diff_buffer,
     T* partial_diff_buffer,
-    int partial_diff_buffer_depth
+    int partial_diff_buffer_depth,
+    T* energy_comp
 )
 {
-    uint64_t chunk_size = 1L << suffix_size;
+    uint64_t chunk_size = 1ULL << suffix_size;
     T tmp_energy, candidate_energy;
+    T delta;
+    T tmp_comp;
     uint64_t tmp_state, candidate_state;
     int bit_to_flip;
     int qi;
@@ -218,16 +288,16 @@ __global__ void find_ground(
         tmp_energy = energies[i];
         candidate_state = best_states[i];
         tmp_state = states[i];
+        tmp_comp = (energy_comp == nullptr) ? static_cast<T>(0) : energy_comp[i];
         for (uint64_t j = 0; j < num_iterations; j++) {
             bit_to_flip = bit_buffer[j];
             if (bit_to_flip < partial_diff_buffer_depth) {
                 qi = (tmp_state >> bit_to_flip) & 1;
-                tmp_energy = tmp_energy
-                    - (2 * qi - 1)
-                        * (row_ptr(partial_diff_buffer, chunk_size, bit_to_flip)[i]
-                           + prefix_diff_buffer[j]);
+                delta = (2 * qi - 1)
+                    * (row_ptr(partial_diff_buffer, chunk_size, bit_to_flip)[i]
+                       + prefix_diff_buffer[j]);
             } else {
-                tmp_energy -= energy_diff_reduced(
+                delta = energy_diff_reduced(
                     row_ptr(qubo, N, bit_to_flip),
                     N,
                     N - suffix_size,
@@ -237,7 +307,13 @@ __global__ void find_ground(
                 );
             }
 
-            tmp_state = tmp_state ^ (1L << bit_to_flip);
+            if (energy_comp == nullptr) {
+                tmp_energy -= delta;
+            } else {
+                compensated_subtract(tmp_energy, tmp_comp, delta);
+            }
+
+            tmp_state = tmp_state ^ (1ULL << bit_to_flip);
             if (tmp_energy < candidate_energy) {
                 candidate_energy = tmp_energy;
                 candidate_state = tmp_state;
@@ -247,6 +323,9 @@ __global__ void find_ground(
         energies[i] = tmp_energy;
         best_states[i] = candidate_state;
         best_energies[i] = candidate_energy;
+        if (energy_comp != nullptr) {
+            energy_comp[i] = tmp_comp;
+        }
     }
 }
 
@@ -260,7 +339,7 @@ __global__ void _initialize_partial_diff_buffer(
     int partial_diff_buffer_depth
 )
 {
-    uint64_t chunk_size = 1L << suffix_size;
+    uint64_t chunk_size = 1ULL << suffix_size;
     uint64_t shifted_state, tmp_state;
     T total;
     T* qubo_row;
@@ -321,7 +400,7 @@ void search(
 )
 {
     // chunk_size = 2 ** suffix_size
-    uint64_t chunk_size = 1 << suffix_size;
+    uint64_t chunk_size = 1ULL << suffix_size;
     // Device vectors with qubo
     device_vector<T> qubo_gpu(qubo, qubo + N * N);
     // Device vectors for energies in current iteration
@@ -338,7 +417,7 @@ void search(
     auto best_spectrum_it = zip(best_states, best_energies);
 
     // Number of chunks s.t. num_chunk * chunk_size = 2 ** N.
-    uint64_t num_chunks = 1 << (N - suffix_size);
+    uint64_t num_chunks = 1ULL << (N - suffix_size);
 
     // Initialize and check if it succeeded.
     init<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, chunk_size);
@@ -436,7 +515,13 @@ void search_ground_only(
     int partial_diff_buffer_depth
 )
 {
-    uint64_t chunk_size = 1L << suffix_size;
+    num_steps_per_kernel = std::max(1, num_steps_per_kernel);
+    uint64_t max_num_steps_per_kernel = 1ULL << (N - suffix_size);
+    num_steps_per_kernel = static_cast<int>(
+        std::min<uint64_t>(static_cast<uint64_t>(num_steps_per_kernel), max_num_steps_per_kernel)
+    );
+
+    uint64_t chunk_size = 1ULL << suffix_size;
     device_vector<T> qubo_gpu(qubo, qubo + N * N);
 
     energy_vector<T> energies(chunk_size);
@@ -447,17 +532,39 @@ void search_ground_only(
     device_vector<int> bit_flip_buffer(num_steps_per_kernel);
     energy_vector<T> prefix_diff_buffer(num_steps_per_kernel);
     energy_vector<T> partial_diff_buffer(partial_diff_buffer_depth * chunk_size);
+    bool use_stabilization = std::is_same<T, float>::value && N >= 40;
+    energy_vector<T> energy_comp(use_stabilization ? chunk_size : 0);
+    T* energy_comp_ptr = use_stabilization ? (T*)energy_comp : nullptr;
 
-    num_steps_per_kernel = std::min(long(num_steps_per_kernel), 1L << (N - suffix_size));
+    uint64_t reanchor_every_steps = 0;
+    if (use_stabilization) {
+        uint64_t suffix_denom = static_cast<uint64_t>(std::max(1, suffix_size));
+        uint64_t scaled_n = static_cast<uint64_t>(N) * static_cast<uint64_t>(N) * 8ULL;
+        reanchor_every_steps = std::max<uint64_t>(
+            1024ULL, (scaled_n + suffix_denom - 1ULL) / suffix_denom
+        );
 
+        // Re-anchoring scans all chunk states, so for large suffix buffers we
+        // run it less often to avoid dominating runtime.
+        if (suffix_size >= 24) {
+            reanchor_every_steps = std::max<uint64_t>(reanchor_every_steps, 32768ULL);
+        } else if (suffix_size >= 22) {
+            reanchor_every_steps = std::max<uint64_t>(reanchor_every_steps, 16384ULL);
+        } else if (suffix_size >= 20) {
+            reanchor_every_steps = std::max<uint64_t>(reanchor_every_steps, 8192ULL);
+        }
+
+        reanchor_every_steps = std::min<uint64_t>(reanchor_every_steps, max_num_steps_per_kernel);
+    }
 
     std::vector<int> src_bit_flip_buffer(num_steps_per_kernel);
     std::vector<T> src_prefix_diff_buffer(num_steps_per_kernel);
 
     uint64_t last_gray_code, next_gray_code;
     uint64_t counter;
-    int64_t base_state;
-    T base_energy;
+    uint64_t base_state;
+    uint64_t processed_steps_since_reanchor;
+    uint64_t num_kernel_calls = max_num_steps_per_kernel / static_cast<uint64_t>(num_steps_per_kernel);
 
     init<<<grid_size, block_size>>>((T*)qubo_gpu, N, (T*)energies, states, chunk_size);
     cuda_error_check(cudaGetLastError());
@@ -475,10 +582,15 @@ void search_ground_only(
     counter = 0;
     last_gray_code = 0;
 
-    base_energy = 0;
     base_state = 0;
+    processed_steps_since_reanchor = 0;
 
-    for (uint64_t i = 0; i < (1L << (N - suffix_size)) / num_steps_per_kernel; i++) {
+    if (use_stabilization) {
+        fill_with_zero<<<grid_size, block_size>>>((T*)energy_comp, chunk_size);
+        cuda_error_check(cudaGetLastError());
+    }
+
+    for (uint64_t i = 0; i < num_kernel_calls; i++) {
         cudaDeviceSynchronize();
         for (uint64_t j = 0; j < num_steps_per_kernel; j++) {
             counter += 1;
@@ -492,7 +604,7 @@ void search_ground_only(
                 }
             }
             last_gray_code = next_gray_code;
-            base_state ^= (1L << src_bit_flip_buffer[j]);
+            base_state ^= (1ULL << src_bit_flip_buffer[j]);
         }
         bit_flip_buffer = src_bit_flip_buffer;
         prefix_diff_buffer = src_prefix_diff_buffer;
@@ -510,8 +622,43 @@ void search_ground_only(
             (int*)bit_flip_buffer,
             (T*)prefix_diff_buffer,
             (T*)partial_diff_buffer,
-            partial_diff_buffer_depth
+            partial_diff_buffer_depth,
+            energy_comp_ptr
         );
+
+        if (use_stabilization) {
+            processed_steps_since_reanchor += static_cast<uint64_t>(num_steps_per_kernel);
+            if (processed_steps_since_reanchor >= reanchor_every_steps) {
+                reanchor_energies<<<grid_size, block_size>>>(
+                    (T*)qubo_gpu, N, states, (T*)energies, chunk_size
+                );
+                cuda_error_check(cudaGetLastError());
+                reanchor_energies<<<grid_size, block_size>>>(
+                    (T*)qubo_gpu, N, best_states, (T*)best_energies, chunk_size
+                );
+                cuda_error_check(cudaGetLastError());
+                refresh_best_from_current<<<grid_size, block_size>>>(
+                    (T*)energies, states, (T*)best_energies, best_states, chunk_size
+                );
+                cuda_error_check(cudaGetLastError());
+                fill_with_zero<<<grid_size, block_size>>>((T*)energy_comp, chunk_size);
+                cuda_error_check(cudaGetLastError());
+                processed_steps_since_reanchor = 0;
+            }
+        }
+    }
+
+    if (use_stabilization && processed_steps_since_reanchor > 0) {
+        reanchor_energies<<<grid_size, block_size>>>((T*)qubo_gpu, N, states, (T*)energies, chunk_size);
+        cuda_error_check(cudaGetLastError());
+        reanchor_energies<<<grid_size, block_size>>>(
+            (T*)qubo_gpu, N, best_states, (T*)best_energies, chunk_size
+        );
+        cuda_error_check(cudaGetLastError());
+        refresh_best_from_current<<<grid_size, block_size>>>(
+            (T*)energies, states, (T*)best_energies, best_states, chunk_size
+        );
+        cuda_error_check(cudaGetLastError());
     }
 
     cuda_error_check(cudaGetLastError());
