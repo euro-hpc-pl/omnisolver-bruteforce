@@ -1,9 +1,24 @@
 import os
 import shlex
+import shutil
 
 from Cython.Build import cythonize
 from setuptools import setup
 from setuptools_cuda import CudaExtension
+
+
+def _set_default_cudahome():
+    if os.environ.get("CUDAHOME"):
+        return
+
+    default_cuda_home = "/usr/local/cuda"
+    default_nvcc = os.path.join(default_cuda_home, "bin", "nvcc")
+    if not os.path.isfile(default_nvcc):
+        return
+
+    nvcc_on_path = shutil.which("nvcc")
+    if nvcc_on_path is None or "/nvidia/hpc_sdk/" in os.path.realpath(nvcc_on_path):
+        os.environ["CUDAHOME"] = default_cuda_home
 
 
 def _prepend_cudahome_bin_to_path():
@@ -34,6 +49,7 @@ def _ensure_nvcc_allow_unsupported_compiler():
     os.environ["NVCC_PREPEND_FLAGS"] = " ".join(flags)
 
 
+_set_default_cudahome()
 _prepend_cudahome_bin_to_path()
 _ensure_nvcc_allow_unsupported_compiler()
 
