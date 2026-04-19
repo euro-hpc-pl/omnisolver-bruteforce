@@ -474,7 +474,16 @@ void search(
         );
     }
 
-    // After all chunks are processed, copy the result to the output arrays.
+    // Final output normalization: recompute energies exactly from the selected
+    // states before returning them.
+    reanchor_energies<<<grid_size, block_size>>>(
+        (T*)qubo_gpu, N, best_states, (T*)best_energies, num_states
+    );
+    cuda_error_check(cudaGetLastError());
+    cudaDeviceSynchronize();
+    thrust::sort_by_key(best_energies.begin(), best_energies.begin() + num_states, best_states.begin());
+
+    // After all chunks are processed, copy the normalized result to output.
     thrust::copy(best_states.begin(), best_states.begin() + num_states, states_out);
     thrust::copy(best_energies.begin(), best_energies.begin() + num_states, energies_out);
 }
@@ -661,7 +670,11 @@ void search_ground_only(
         cuda_error_check(cudaGetLastError());
     }
 
+    // Final output normalization: recompute energies exactly from final
+    // candidate states before selecting the best one.
+    reanchor_energies<<<grid_size, block_size>>>((T*)qubo_gpu, N, best_states, (T*)best_energies, chunk_size);
     cuda_error_check(cudaGetLastError());
+
     cudaDeviceSynchronize();
     thrust::sort_by_key(best_energies.begin(), best_energies.end(), best_states.begin());
     thrust::copy(best_states.begin(), best_states.begin() + 1, states_out);

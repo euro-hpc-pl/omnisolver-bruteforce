@@ -64,6 +64,8 @@ def test_samples_returned_by_sampler_have_correct_energies(
         dtype=dtype,
     )
 
+    energies = np.asarray(result.record.energy)
+    assert np.all(energies[:-1] <= energies[1:])
     assert all(
         bqm.energy(entry.sample) == pytest.approx(entry.energy, abs=1e-3) for entry in result.data()
     )
@@ -126,6 +128,34 @@ def test_ground_only_matches_exact_solver_on_small_problem():
 
     assert gpu_first.energy == pytest.approx(exact_first.energy, abs=5e-4)
     assert bqm.energy(gpu_first.sample) == pytest.approx(exact_first.energy, abs=5e-4)
+
+
+def test_multistate_float64_outputs_sorted_and_recomputed():
+    rng = np.random.default_rng(2027)
+    bqm = random_bqm(
+        20,
+        "BINARY",
+        0.0,
+        rng,
+        linear_range=(-3, 3),
+        quadratic_range=(-1.5, 1.5),
+    )
+
+    sampler = BruteforceGPUSampler()
+    result = sampler.sample(
+        bqm,
+        num_states=64,
+        suffix_size=12,
+        grid_size=2**8,
+        block_size=128,
+        dtype=np.float64,
+    )
+
+    energies = np.asarray(result.record.energy)
+    assert np.all(energies[:-1] <= energies[1:])
+    assert all(
+        bqm.energy(entry.sample) == pytest.approx(entry.energy, abs=1e-8) for entry in result.data()
+    )
 
 
 @pytest.mark.skipif(
