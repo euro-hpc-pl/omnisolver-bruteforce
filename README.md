@@ -20,9 +20,23 @@ and then run:
 pip install omnisolver-bruteforce
 ```
 
+During build, this package will:
+- Prefer `CUDAHOME/bin/nvcc` (if `CUDAHOME` is set), so multi-CUDA environments are deterministic.
+- Add NVCC flag `-allow-unsupported-compiler` via `NVCC_PREPEND_FLAGS` to reduce host compiler compatibility build failures.
+
 > **Warning**
 > If you don't set the `CUDAHOME` directory, an attempt will be made to deduce it based on the location of your `nvcc` compiler.
 > However, this process might not work in all the cases and should not be relied on.
+
+### Troubleshooting (multiple CUDA toolchains)
+
+If your system has multiple CUDA toolchains (for example HPC SDK and system CUDA), set:
+
+```shell
+export CUDAHOME=/usr/local/cuda
+```
+
+before installing so build uses `CUDAHOME/bin/nvcc`.
 
 ## Command line usage
 
