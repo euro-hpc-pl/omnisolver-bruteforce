@@ -1,1 +1,6 @@
+include LICENSE
+include README.md
 include omnisolver/bruteforce/gpu/gpu.yml
+include omnisolver/extensions/*.cu
+include omnisolver/extensions/*.h
+include omnisolver/extensions/*.pyx

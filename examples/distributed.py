@@ -13,7 +13,7 @@ def random_bqm(num_variables, vartype, offset, rng):
         (i, j): coef
         for (i, j), coef in zip(
             [(i, j) for i in range(num_variables) for j in range(i + 1, num_variables)],
-            rng.uniform(-1, -1, size=(num_variables - 1) * num_variables // 2),
+            rng.uniform(-1, 1, size=(num_variables - 1) * num_variables // 2),
         )
     }
     return BQM(linear, quadratic, offset, vartype=vartype)

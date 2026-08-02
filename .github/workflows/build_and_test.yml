@@ -1,22 +1,39 @@
 name: Run tests
-on: [pull_request]
+on:
+  push:
+    branches: [master, main]
+    tags: ["*"]
+  pull_request:
 jobs:
   run_tests:
     runs-on: [self-hosted,gpu]
     strategy:
+      fail-fast: false
       matrix:
         python-versions: ["3.10", "3.11"]
+        # Oldest supported toolkit and the one used for the published measurements.
+        cuda: ["12.4.0", "12.5.0"]
     steps:
       - uses: Jimver/cuda-toolkit@v0.2.20
         id: cuda-toolkit
         with:
-          cuda: '12.5.0'
-          log-file-suffix: '${{ matrix.python-versions }}.txt'
+          cuda: ${{ matrix.cuda }}
+          log-file-suffix: '${{ matrix.python-versions }}-${{ matrix.cuda }}.txt'
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-versions }}
-      - name: build_and_run_examples
+      - name: Report toolchain
         run: |
-          pip install .
+          nvcc --version
+          nvidia-smi || true
+      - name: Install package and test dependencies
+        run: |
+          pip install ".[distributed]"
           pip install pytest
+      - name: Run test suite
+        run: |
+          pytest tests -v -m "not slow"
+      - name: Run slow tests (exhaustive search at N >= 40)
+        run: |
+          pytest tests -v -m slow

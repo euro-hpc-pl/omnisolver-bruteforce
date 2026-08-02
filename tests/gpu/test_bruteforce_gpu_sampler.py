@@ -7,7 +7,6 @@ from numba import cuda
 
 from omnisolver.bruteforce.gpu import BruteforceGPUSampler
 
-
 pytestmark = pytest.mark.skipif(not cuda.is_available(), reason="CUDA-compatible GPU is required")
 
 
@@ -23,7 +22,9 @@ def random_bqm(
     quad_low, quad_high = quadratic_range
     linear = {
         i: coef
-        for i, coef in zip(range(num_variables), rng.uniform(linear_low, linear_high, size=num_variables))
+        for i, coef in zip(
+            range(num_variables), rng.uniform(linear_low, linear_high, size=num_variables)
+        )
     }
     quadratic = {
         (i, j): coef

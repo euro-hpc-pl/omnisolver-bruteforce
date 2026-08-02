@@ -12,70 +12,72 @@ hide:
 <h1></h1>
 
 <p align="center">
-    <a href="https://github.com/euro-hpc-pl/omnisolver/actions/workflows/quality_checks.yml">
-    <img src="https://github.com/euro-hpc-pl/omnisolver/actions/workflows/quality_checks.yml/badge.svg" alt="Tests"/>
-    </a>
-<a href="https://euro-hpc-pl.github.io/omnisolver">
-<img alt="Docs" src="https://img.shields.io/github/actions/workflow/status/euro-hpc-pl/omnisolver/quality_checks.yml?label=Docs">
-</a>
+<em>Exhaustive search plugin for <a href="https://github.com/euro-hpc-pl/omnisolver">Omnisolver</a></em>
 </p>
 
-**Documentation:** https://euro-hpc-pl.github.io/omnisolver 
+**Source code:** <https://github.com/euro-hpc-pl/omnisolver-bruteforce>
 
-**Source code:** https://github.com/euro-hpc-pl/omnisolver
+**Framework documentation:** <https://euro-hpc-pl.github.io/omnisolver>
 
 ---
 
-Omnisolver is a collection of Binary Quadratic Model solvers and a framework for implementing them.
+`omnisolver-bruteforce` solves Ising and QUBO instances by **exhaustive search on
+CUDA-enabled GPUs**. It enumerates all $2^N$ configurations of an $N$-variable instance and
+therefore returns a *certified* optimum rather than a heuristic one, which makes it useful
+as a ground-truth reference for annealers, heuristics and quantum-inspired solvers.
 
+The plugin provides two samplers:
 
+| Sampler | Scope | Use when |
+|---|---|---|
+| `BruteforceGPUSampler` | one node, one GPU | a single device has enough memory and the expected wall-clock time is acceptable |
+| `DistributedBruteforceGPUSampler` | many GPUs, many nodes, via [Ray](https://www.ray.io/) | the problem no longer fits a single device within a practical time frame |
 
-## Why Omnisolver?
-
-### Benefits for the end-users
-
-Omnisolver contains a selection of standard and more sophisticated algorithms for solving BQMs. All solvers are available through intuitive CLI or from Python scripts as dimod based Samplers.
-
-### Benefits for solver creators
-
-Omnisolver allows developer to focus on algorithms instead of common tasks like handling input/output or creating CLI.
+The distributed sampler fixes $k$ variables, turning the search into $2^k$ independent
+subproblems of $N-k$ variables that are dispatched across the available GPUs and merged
+afterwards.
 
 ## Quickstart
 
 <!-- termynal -->
 
 ```
-# Install base omnisolver package
-$ pip install omnisolver
+# Point the build at your CUDA installation
+$ export CUDAHOME=/usr/local/cuda
+# Install the plugin (add [distributed] for the multi-GPU sampler)
+$ pip install "omnisolver-bruteforce[distributed]"
 ---> 100%
-Successfuly installed omnisolver
-# Install chosen plugins (e.g. parallel-tempering solver)
-$ pip install omnisolver-pt
----> 100%
-Successfuly installed omnisolver-pt
+Successfully installed omnisolver-bruteforce
 # Create an instance file in COOrdinate format
 $ echo "0 1 1.0
 > 1 2 1.0
 > 2 0 1.0" > instance.txt
-# Run solver
-$ omnisolver pt --vartype SPIN instance.txt
+# Run the solver
+$ omnisolver bruteforce-gpu --vartype SPIN --num_states 1 instance.txt
 0,1,2,energy,num_occurrences
-1,-1,-1,-1.0,1
+1,-1,1,-1.0,1
 ```
 
-## What's next?
+## Scope and limitations
 
-Here are some resources to get you started:
+Exhaustive search costs $O(2^N)$ regardless of how many GPUs are used: each added variable
+doubles the runtime. The plugin lowers the constant factor and makes the search numerically
+dependable at large $N$, but it cannot change that scaling. Treat it as a **verification and
+certification backend**, not as a routine optimizer.
 
-- Start with user guide to learn about the installation methods and general usage patterns.
-- Discover available solvers in our plugin list.
-- If you are interested in developing your own solver, or are interested in in-depth details of how the Omnisolver
-  works, check our solver creator guide and reference manual.
+Concrete bounds:
+
+* each subproblem is held in a 64-bit word, so a single kernel enumerates at most
+  **64 variables**; the distributed sampler therefore reaches $N \le 64 + k$;
+* `suffix_size` is bounded by the working-set budget of the device;
+* the stabilized single-precision path engages from 40 variables per kernel upwards.
+
+See the [user guide](userguide.md) for details and for how to choose the parameters.
 
 ## Citing
 
-If you used Omnisolver in your research, consider citing it in your paper.
-You can use the following BibTeX entry:
+If you used this plugin in your research, please cite both the framework and the CUDA
+kernel it builds on:
 
 ```text
 @article{omnisolver2023,
@@ -84,8 +86,17 @@ You can use the following BibTeX entry:
     volume = {24},
     pages = {101559},
     year = {2023},
-    doi = {https://doi.org/10.1016/j.softx.2023.101559},
-    url = {https://www.softxjournal.com/article/S2352-7110(23)00255-8/},
+    doi = {10.1016/j.softx.2023.101559},
     author = {Konrad Jałowiecki and {\L}ukasz Pawela},
+}
+
+@article{jalowiecki2021brute,
+    title = {Brute-forcing spin-glass problems with CUDA},
+    journal = {Computer Physics Communications},
+    volume = {260},
+    pages = {107728},
+    year = {2021},
+    doi = {10.1016/j.cpc.2020.107728},
+    author = {Konrad Jałowiecki and Marek M. Rams and Bart{\l}omiej Gardas},
 }
 ```

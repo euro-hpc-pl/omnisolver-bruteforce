@@ -1,4 +1,4 @@
-"""Implementation of parallel tempering plugin for Omnisolver."""
+"""Implementation of the GPU-accelerated exhaustive search plugin for Omnisolver."""
 from omnisolver.common.plugin import Plugin, plugin_from_specification
 from pkg_resources import resource_stream
 from yaml import safe_load
