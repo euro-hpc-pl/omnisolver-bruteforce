@@ -13,10 +13,22 @@ from .sampler import (
     validate_kernel_problem_size,
 )
 
-#: Number of partial results combined by a single merge task. Merging is performed by a
-#: hierarchy of Ray tasks rather than on the controller, so the number of rounds grows
-#: logarithmically with the number of subproblems.
-DEFAULT_MERGE_BATCH_SIZE = 8
+#: Default number of partial results combined by a single merge task. ``None`` selects the
+#: direct merge, in which the controller collects every partial result and concatenates them
+#: in one go.
+#:
+#: The direct merge is the default because it is measurably the cheaper of the two in the
+#: regime this solver is normally used in. Measured for ``num_states=1`` (see
+#: ``benchmarks/exp_controller_cost.py`` in the article repository), the direct merge wins up
+#: to roughly 10 ** 4 subproblems, because the concatenation itself is cheap and performing it
+#: in a hierarchy of remote tasks replaces a cheap local operation by several rounds of task
+#: scheduling. Above that the hierarchy wins, since its depth grows only logarithmically while
+#: the direct merge has to fetch every partial result: at 2 ** 16 subproblems the two cost
+#: about 4.3 s and 5.9 s respectively, against a 4.8 s floor set by Ray's task scheduling
+#: alone. Setting an integer also bounds the memory the controller needs to at most
+#: ``merge_batch_size`` partial results at a time, which matters when ``num_states`` is large
+#: or the partial results are big.
+DEFAULT_MERGE_BATCH_SIZE = None
 
 
 @ray.remote(num_gpus=1)
@@ -102,11 +114,11 @@ class DistributedBruteforceGPUSampler(Sampler):
         :param partial_diff_buffer_depth: depth of the incremental energy difference buffers.
         :param dtype: datatype to use, either np.float32 or np.float64, or one of the names
             accepted by :func:`normalize_dtype`. Forwarded unchanged to the workers.
-        :param merge_batch_size: number of partial results combined by a single merge task.
-            Keeping this below the number of subproblems keeps the merge off the controller and
-            makes its cost grow logarithmically, rather than linearly, with the number of
-            subproblems. Pass a value of at least 2 ** num_fixed_vars to obtain the single-shot
-            merge used up to release 0.0.5.
+        :param merge_batch_size: ``None`` (the default) collects every partial result on the
+            controller and concatenates them in one go. An integer instead merges them in a
+            hierarchy of Ray tasks, at most ``merge_batch_size`` at a time, which bounds the
+            memory the controller needs at the cost of several rounds of task scheduling; see
+            :data:`DEFAULT_MERGE_BATCH_SIZE` for when that trade is worth making.
         :raises ValueError: if num_fixed_vars or merge_batch_size is out of range, if the
             resulting subproblems cannot be enumerated by the kernels, or if dtype is not a
             supported precision.
@@ -124,8 +136,11 @@ class DistributedBruteforceGPUSampler(Sampler):
                 f"num_fixed_vars has to satisfy 0 <= num_fixed_vars < {bqm.num_variables} "
                 f"(the number of variables of bqm), but got {num_fixed_vars}."
             )
-        if merge_batch_size < 2:
-            raise ValueError(f"merge_batch_size has to be at least 2, but got {merge_batch_size}.")
+        if merge_batch_size is not None and merge_batch_size < 2:
+            raise ValueError(
+                f"merge_batch_size has to be at least 2, or None for a direct merge, "
+                f"but got {merge_batch_size}."
+            )
         validate_kernel_problem_size(bqm.num_variables - num_fixed_vars, suffix_size)
 
         if bqm.vartype == Vartype.SPIN:
@@ -175,13 +190,21 @@ class DistributedBruteforceGPUSampler(Sampler):
 
         merge_start_counter = perf_counter()
         num_merge_rounds = 0
-        while len(refs) > 1:
-            refs = [
-                _merge_partial_results.remote(num_states, *batch)
-                for batch in _batched(refs, merge_batch_size)
-            ]
-            num_merge_rounds += 1
-        result = ray.get(refs[0])
+        if merge_batch_size is None:
+            partial_results = ray.get(refs)
+            result = (
+                partial_results[0]
+                if len(partial_results) == 1
+                else concatenate(partial_results).truncate(num_states)
+            )
+        else:
+            while len(refs) > 1:
+                refs = [
+                    _merge_partial_results.remote(num_states, *batch)
+                    for batch in _batched(refs, merge_batch_size)
+                ]
+                num_merge_rounds += 1
+            result = ray.get(refs[0])
         merge_time_in_seconds = perf_counter() - merge_start_counter
 
         result.info.update(
