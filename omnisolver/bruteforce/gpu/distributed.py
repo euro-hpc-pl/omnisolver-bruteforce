@@ -13,22 +13,22 @@ from .sampler import (
     validate_kernel_problem_size,
 )
 
-#: Default number of partial results combined by a single merge task. ``None`` selects the
-#: direct merge, in which the controller collects every partial result and concatenates them
-#: in one go.
+#: Number of partial results combined by a single merge task when the hierarchical strategy is
+#: used. Eight is the value the shipped measurements were taken with.
+DEFAULT_MERGE_BATCH_SIZE = 8
+
+#: Number of subproblems above which the hierarchical merge becomes cheaper than collecting
+#: every partial result on the controller and concatenating once.
 #:
-#: The direct merge is the default because it is measurably the cheaper of the two in the
-#: regime this solver is normally used in. Measured for ``num_states=1`` (see
-#: ``benchmarks/exp_controller_cost.py`` in the article repository), the direct merge wins up
-#: to roughly 10 ** 4 subproblems, because the concatenation itself is cheap and performing it
-#: in a hierarchy of remote tasks replaces a cheap local operation by several rounds of task
-#: scheduling. Above that the hierarchy wins, since its depth grows only logarithmically while
-#: the direct merge has to fetch every partial result: at 2 ** 16 subproblems the two cost
-#: about 4.3 s and 5.9 s respectively, against a 4.8 s floor set by Ray's task scheduling
-#: alone. Setting an integer also bounds the memory the controller needs to at most
-#: ``merge_batch_size`` partial results at a time, which matters when ``num_states`` is large
-#: or the partial results are big.
-DEFAULT_MERGE_BATCH_SIZE = None
+#: Measured with ``num_states=1`` (see ``benchmarks/exp_controller_cost.py`` in the article
+#: repository): the direct merge grows as O(P^0.97) and overtakes the hierarchy below this
+#: threshold, where the concatenation is cheap enough that performing it in remote tasks only
+#: adds rounds of scheduling; above it the hierarchy's logarithmic depth wins, reaching 3.9 s
+#: against 7.4 s at 2 ** 16 subproblems. Either side of the threshold the two differ by under a
+#: millisecond up to a few hundred subproblems, so the choice only matters at large k. The
+#: hierarchy additionally bounds the memory the controller needs, which is why an explicit
+#: ``merge_batch_size`` always selects it.
+MERGE_TREE_THRESHOLD = 64
 
 
 @ray.remote(num_gpus=1)
@@ -77,7 +77,9 @@ def _merge_partial_results(num_states, *partial_results):
 
 def _batched(items, batch_size):
     for start in range(0, len(items), batch_size):
-        yield items[start : start + batch_size]
+        # A simple slice keeps black and flake8 (E203) from disagreeing about the colon.
+        stop = start + batch_size
+        yield items[start:stop]
 
 
 class DistributedBruteforceGPUSampler(Sampler):
@@ -92,7 +94,7 @@ class DistributedBruteforceGPUSampler(Sampler):
         num_steps_per_kernel=1,
         partial_diff_buffer_depth=1,
         dtype=np.float32,
-        merge_batch_size=DEFAULT_MERGE_BATCH_SIZE,
+        merge_batch_size=None,
     ):
         """Solve Binary Quadratic Model by distributing an exhaustive search over Ray workers.
 
@@ -114,11 +116,13 @@ class DistributedBruteforceGPUSampler(Sampler):
         :param partial_diff_buffer_depth: depth of the incremental energy difference buffers.
         :param dtype: datatype to use, either np.float32 or np.float64, or one of the names
             accepted by :func:`normalize_dtype`. Forwarded unchanged to the workers.
-        :param merge_batch_size: ``None`` (the default) collects every partial result on the
-            controller and concatenates them in one go. An integer instead merges them in a
-            hierarchy of Ray tasks, at most ``merge_batch_size`` at a time, which bounds the
-            memory the controller needs at the cost of several rounds of task scheduling; see
-            :data:`DEFAULT_MERGE_BATCH_SIZE` for when that trade is worth making.
+        :param merge_batch_size: ``None`` (the default) picks a merge strategy from the number
+            of subproblems, using :data:`MERGE_TREE_THRESHOLD`: at or below the threshold every
+            partial result is collected on the controller and concatenated in one go, above it
+            they are reduced by a hierarchy of Ray tasks combining
+            :data:`DEFAULT_MERGE_BATCH_SIZE` of them at a time. An integer forces the hierarchy
+            with that batch size, which also bounds the memory the controller needs; a value of
+            at least ``2 ** num_fixed_vars`` reproduces the single-shot merge of release 0.0.5.
         :raises ValueError: if num_fixed_vars or merge_batch_size is out of range, if the
             resulting subproblems cannot be enumerated by the kernels, or if dtype is not a
             supported precision.
@@ -127,7 +131,7 @@ class DistributedBruteforceGPUSampler(Sampler):
             ``solve_time_in_seconds`` (dispatch plus completion of every subproblem search),
             ``merge_time_in_seconds`` (combining the partial results and fetching the final
             one) and ``total_time_in_seconds`` (the sum of the latter two), together with
-            ``num_subproblems`` and ``num_merge_rounds``.
+            ``num_subproblems``, ``num_merge_rounds`` and ``merge_strategy``.
         """
         dtype = normalize_dtype(dtype)
 
@@ -190,7 +194,9 @@ class DistributedBruteforceGPUSampler(Sampler):
 
         merge_start_counter = perf_counter()
         num_merge_rounds = 0
-        if merge_batch_size is None:
+        use_hierarchy = merge_batch_size is not None or len(refs) > MERGE_TREE_THRESHOLD
+        batch_size = merge_batch_size if merge_batch_size is not None else DEFAULT_MERGE_BATCH_SIZE
+        if not use_hierarchy:
             partial_results = ray.get(refs)
             result = (
                 partial_results[0]
@@ -201,7 +207,7 @@ class DistributedBruteforceGPUSampler(Sampler):
             while len(refs) > 1:
                 refs = [
                     _merge_partial_results.remote(num_states, *batch)
-                    for batch in _batched(refs, merge_batch_size)
+                    for batch in _batched(refs, batch_size)
                 ]
                 num_merge_rounds += 1
             result = ray.get(refs[0])
@@ -215,6 +221,7 @@ class DistributedBruteforceGPUSampler(Sampler):
                 "total_time_in_seconds": solve_time_in_seconds + merge_time_in_seconds,
                 "num_subproblems": len(subproblems),
                 "num_merge_rounds": num_merge_rounds,
+                "merge_strategy": "hierarchical" if use_hierarchy else "direct",
             }
         )
         return result.relabel_variables(mapping)
