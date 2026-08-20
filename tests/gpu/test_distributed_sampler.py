@@ -63,12 +63,13 @@ def test_ground_state_matches_exact_solver(num_fixed_vars):
     assert bqm.energy(result.first.sample) == pytest.approx(expected.energy, abs=5e-4)
 
 
-@pytest.mark.parametrize("merge_batch_size", [2, 4, 16])
+@pytest.mark.parametrize("merge_batch_size", [None, 2, 4, 16])
 def test_low_energy_spectrum_matches_exact_solver_for_any_merge_hierarchy(merge_batch_size):
-    """The hierarchical merge must return the globally lowest states, not per-branch ones.
+    """Every merge strategy must return the globally lowest states, not per-branch ones.
 
-    With merge_batch_size below the number of subproblems the partial results are combined in
-    several rounds, which is the regime that a merge dropping candidates would break.
+    ``None`` is the direct merge; with merge_batch_size below the number of subproblems the
+    partial results are combined in several rounds, which is the regime that a merge dropping
+    candidates would break.
     """
     num_states = 8
     bqm = random_bqm(14, "BINARY", np.random.default_rng(7))
@@ -102,16 +103,24 @@ def test_dtype_is_forwarded_to_the_workers_for_spin_models():
     assert result.first.energy == pytest.approx(expected.energy, abs=1e-9)
 
 
-def test_reported_timings_separate_the_search_from_the_merge():
+@pytest.mark.parametrize(
+    "merge_batch_size, expected_rounds",
+    [(None, 0), (2, 2), (4, 1)],  # 4 subproblems: direct, 4->2->1, 4->1
+)
+def test_reported_timings_separate_the_search_from_the_merge(merge_batch_size, expected_rounds):
     bqm = random_bqm(14, "BINARY", np.random.default_rng(13))
 
     result = DistributedBruteforceGPUSampler().sample(
-        bqm, num_states=4, num_fixed_vars=2, merge_batch_size=2, **KERNEL_ARGS
+        bqm,
+        num_states=4,
+        num_fixed_vars=2,
+        merge_batch_size=merge_batch_size,
+        **KERNEL_ARGS,
     )
 
     info = result.info
     assert info["num_subproblems"] == 4
-    assert info["num_merge_rounds"] == 2  # 4 -> 2 -> 1 with merge_batch_size=2
+    assert info["num_merge_rounds"] == expected_rounds
     assert 0 < info["dispatch_time_in_seconds"] <= info["solve_time_in_seconds"]
     assert info["merge_time_in_seconds"] > 0
     assert info["total_time_in_seconds"] == pytest.approx(
