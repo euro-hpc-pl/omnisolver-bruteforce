@@ -1,16 +1,16 @@
 schema_version: 1
 name: "bruteforce-gpu"
 sampler_class: "omnisolver.bruteforce.gpu.BruteforceGPUSampler"
-description: "Bruteforce (a.k.a exhaustive search) sampler using CUA-enabled GPU"
+description: "Bruteforce (a.k.a. exhaustive search) sampler using a CUDA-enabled GPU"
 
 init_args: []
 sample_args:
   - name: "num_states"
-    help: "Size of the low energy spectrum to compute"
+    help: "Size of the low energy spectrum to compute. A value of 1 selects the faster ground-state-only code path"
     type: int
     default: 100
   - name: "suffix_size"
-    help: "Number of suffix bits that are fixed during all iterations"
+    help: "Number of suffix bits enumerated in the resident chunk, i.e. 2 ** suffix_size configurations are kept in the GPU working set at a time"
     type: int
     default: 24
   - name: "grid_size"
@@ -21,8 +21,16 @@ sample_args:
     help: "Number of threads in each block running bruteforce kernels"
     type: int
     default: 256
+  - name: "num_steps_per_kernel"
+    help: "Number of chunks processed by a single kernel launch (ground-state-only path)"
+    type: int
+    default: 16
+  - name: "partial_diff_buffer_depth"
+    help: "Depth of the incremental energy difference buffers (ground-state-only path)"
+    type: int
+    default: 1
   - name: "dtype"
-    help: "Data type to use, either 'float' or 'double'"
+    help: "Data type to use: 'float' for single precision (default, enables the stabilized fast path) or 'double' for double precision"
     type: str
     choices: ["float", "double"]
     default: "float"
