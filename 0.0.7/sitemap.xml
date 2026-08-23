@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://euro-hpc-pl.github.io/omnisolver-bruteforce/latest/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://euro-hpc-pl.github.io/omnisolver-bruteforce/latest/userguide/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://euro-hpc-pl.github.io/omnisolver-bruteforce/latest/reference/omnisolver_bruteforce_distributed/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://euro-hpc-pl.github.io/omnisolver-bruteforce/latest/reference/omnisolver_bruteforce_sampler/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+</urlset>

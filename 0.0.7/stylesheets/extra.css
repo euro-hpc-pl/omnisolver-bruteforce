@@ -1,0 +1,24 @@
+/* SPDX-FileCopyrightText: 2021-2026 The Omnisolver developers
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Referenced by mkdocs.yml (extra_css) and required by theme.palette.primary: custom.
+ */
+
+:root {
+  --md-primary-fg-color: #23486a;
+  --md-primary-fg-color--light: #3a6ea5;
+  --md-primary-fg-color--dark: #16304a;
+  --md-accent-fg-color: #3a6ea5;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #16304a;
+  --md-accent-fg-color: #6fa8dc;
+}
+
+/* Keep wide parameter tables readable instead of letting the page scroll sideways. */
+.md-typeset table:not([class]) {
+  display: table;
+  width: 100%;
+}

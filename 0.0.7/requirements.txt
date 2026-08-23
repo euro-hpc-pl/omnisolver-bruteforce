@@ -1,0 +1,10 @@
+# Documentation toolchain. Kept in sync with the "docs" extra in pyproject.toml.
+#
+# Note that building the reference manual imports omnisolver.bruteforce, which in turn
+# imports the compiled CUDA extension, so the docs have to be built in an environment where
+# the package itself is installed (see .github/workflows/docs.yml).
+mkdocs~=1.5
+mkdocs-material~=9.4
+mkdocstrings[python]>=0.24
+termynal~=0.14
+mike~=2.0
